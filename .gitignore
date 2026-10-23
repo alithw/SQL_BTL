@@ -1,0 +1,6 @@
+execution/
+tailieu/
+database/
+*.mdf
+*.ldf
+*.bak
