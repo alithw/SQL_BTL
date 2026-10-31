@@ -5,7 +5,46 @@
 > - **Trên SQL Server Management Studio (SSMS):** Bôi đen trọn vẹn vùng code của từng Case (bao gồm từ phần khai báo biến `DECLARE` nếu có đến hết câu lệnh hoặc `GO`), sau đó nhấn phím **`F5`** (hoặc nút **`Execute`**).
 > - **Trên MySQL Workbench:** Bôi đen trọn vẹn vùng code của từng Case (bao gồm từ phần khai báo biến `SET` nếu có đến hết dấu chấm phẩy `;` hoặc `COMMIT;`), sau đó nhấn tổ hợp phím **`Ctrl + Shift + Enter`** (Execute Selection).
 
-Case 1: Sao lưu toàn phần Cơ sở dữ liệu (Full Database Backup)
+<a id="muc-luc"></a>
+## MỤC LỤC TRUY VẤN
+
+### I. Quản trị, Sao lưu & Phục hồi Hệ thống
+- [Case 1: Sao lưu toàn phần Cơ sở dữ liệu (Full Database Backup)](#case-1)
+- [Case 2: Sao lưu vi sai và Nhật ký giao dịch (Differential & Transaction Log Backup)](#case-2)
+- [Case 3: Phục hồi Cơ sở dữ liệu khi xảy ra sự cố (Disaster Recovery & Restore)](#case-3)
+
+### II. Nghiệp vụ Lễ tân & Khai thác Buồng phòng
+- [Case 4: Tra cứu phòng trống khả dụng theo khoảng thời gian và loại phòng (Room Availability Query)](#case-4)
+- [Case 5: Tiếp nhận khách làm thủ tục nhận phòng theo giao dịch toàn vẹn (Check-in Transaction)](#case-5)
+- [Case 6: Ghi nhận thông tin khách hàng sử dụng dịch vụ phát sinh (Service Consumption Recording)](#case-6)
+- [Case 7: Giám sát buồng phòng và danh sách khách hàng đang lưu trú (In-House Guest & Room Monitoring)](#case-7)
+
+### III. Hồ sơ Khách hàng & Thanh toán Thu ngân
+- [Case 8: Tổng hợp lịch sử lưu trú và phân loại khách hàng trung thành (Customer 360 & Loyalty Profiling)](#case-8)
+- [Case 9: Bảng kê đối soát chi phí tiền phòng và dịch vụ trước thanh toán (Pre-bill Folio Audit)](#case-9)
+- [Case 10: Xử lý thủ tục trả phòng và xuất hóa đơn thanh toán khép kín (Check-out & Billing Transaction)](#case-10)
+- [Case 11: Kế toán đối soát và phân bổ doanh thu theo phương thức thanh toán (Revenue Reconciliation by Payment Method)](#case-11)
+
+### IV. Báo cáo Thống kê Quản trị & Phân tích Hiệu suất (BI & KPIs)
+- [Case 12: Báo cáo tổng hợp doanh thu theo thời gian phân tách theo cấu phần (Financial Revenue Breakdown Report)](#case-12)
+- [Case 13: Thống kê và xếp hạng các dịch vụ mang lại doanh thu cao nhất (Top Profitable Services Analysis)](#case-13)
+- [Case 14: Thống kê tỷ lệ lấp đầy phòng và doanh thu trên mỗi phòng sẵn có (Occupancy Rate & RevPAR Analysis)](#case-14)
+- [Case 15: Đánh giá hiệu suất làm việc của nhân viên lễ tân theo doanh số xử lý (Front Desk Staff Productivity Evaluation)](#case-15)
+- [Case 16: Truy vấn phân cấp tổ chức nhân sự bằng đệ quy (Organizational Hierarchy with Recursive CTE)](#case-16)
+
+### V. Xử lý Tình huống Ngoại lệ & Kiểm soát Giao dịch Đồng thời
+- [Case 17: Xử lý tình huống hủy đặt phòng và tự động hoàn trả trạng thái phòng (Booking Cancellation & Room Status Release)](#case-17)
+- [Case 18: Xử lý tình huống đổi phòng lưu trú giữa chừng cho khách hàng (Room Transfer & Upgrade Handling)](#case-18)
+- [Case 19: Xử lý tình huống gia hạn thời gian lưu trú và kiểm tra xung đột lịch đặt (Stay Extension & Overlap Verification)](#case-19)
+- [Case 20: Kiểm soát tranh chấp đặt phòng đồng thời bằng khóa mức dòng (Concurrency Control & Overbooking Prevention)](#case-20)
+- [Case 21: Phát hiện sai lệch số liệu và cảnh báo bất thường trên hóa đơn (Billing Discrepancy & Anomaly Detection)](#case-21)
+- [Case 22: Xử lý cập nhật thông tin nhân viên nghỉ việc và chuyển giao quyền quản lý (Employee Termination & Soft-Delete Reassignment)](#case-22)
+- [Case 23: Khóa bảo trì phòng đột xuất và điều phối các đơn đặt phòng bị ảnh hưởng (Emergency Room Maintenance & Rescheduling)](#case-23)
+
+---
+
+<a id="case-1"></a>
+### Case 1: Sao lưu toàn phần Cơ sở dữ liệu (Full Database Backup)
 - Trường hợp sử dụng: Được thực hiện định kỳ theo chính sách an toàn thông tin của hệ thống thông tin khách sạn hoặc trước khi tiến hành bảo trì, nâng cấp cấu trúc lược đồ quan hệ.
 - Mục đích: Trích xuất và lưu trữ bản sao toàn vẹn 100% dữ liệu, cấu trúc bảng (schema), các chỉ mục (indexes), ràng buộc toàn vẹn (PK, FK, CK, UQ) của toàn bộ 13 quan hệ trong CSDL QuanLyKhachSan, làm điểm mốc cơ sở phục vụ công tác khôi phục hệ thống khi xảy ra sự cố.
 Lệnh chạy:
@@ -58,9 +97,12 @@ CREATE TABLE QuanLyKhachSan_Backup.HoaDon_Backup AS SELECT * FROM QuanLyKhachSan
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Đóng vai trò là bản lưu trữ dữ liệu an toàn phục vụ phân tích đối soát và dự phòng rủi ro cho hệ thống quản lý khách sạn.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 2: Sao lưu vi sai và Nhật ký giao dịch (Differential & Transaction Log Backup)
+<a id="case-2"></a>
+### Case 2: Sao lưu vi sai và Nhật ký giao dịch (Differential & Transaction Log Backup)
 - Trường hợp sử dụng: Được thực hiện định kỳ xen kẽ giữa các chu kỳ sao lưu toàn phần: Sao lưu vi sai (Differential) thực hiện định kỳ 4-6 tiếng, sao lưu nhật ký giao dịch (Log) thực hiện mỗi 15-30 phút.
 - Mục đích: Thu hẹp khoảng thời gian mất mát dữ liệu (RPO - Recovery Point Objective) xuống mức tối thiểu mà không tiêu tốn quá nhiều dung lượng lưu trữ so với việc thực hiện sao lưu toàn phần liên tục.
 Lệnh chạy:
@@ -121,9 +163,12 @@ WHERE NgayLap >= CURRENT_DATE();
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Dùng để tái hiện (replay) chính xác các giao dịch kinh doanh phát sinh giữa hai thời điểm sao lưu định kỳ.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 3: Phục hồi Cơ sở dữ liệu khi xảy ra sự cố (Disaster Recovery & Restore)
+<a id="case-3"></a>
+### Case 3: Phục hồi Cơ sở dữ liệu khi xảy ra sự cố (Disaster Recovery & Restore)
 - Trường hợp sử dụng: Áp dụng trong tình huống khẩn cấp khi hệ thống CSDL gặp sự cố nghiêm trọng: Hỏng ổ đĩa lưu trữ, dữ liệu bị sai lệch diện rộng do lỗi ứng dụng, hoặc người vận hành thao tác nhầm lẫn.
 - Mục đích: Phục hồi CSDL QuanLyKhachSan về trạng thái ổn định và nhất quán, áp dụng chuỗi tuần tự từ bản Full Backup, bản Differential Backup đến các bản Transaction Log Backup.
 Lệnh chạy:
@@ -207,9 +252,12 @@ COMMIT;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Áp dụng khi cần hoàn nguyên nhanh các bảng dữ liệu nghiệp vụ về trạng thái chuẩn trước khi xảy ra thao tác sai lệch.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 4: Tra cứu phòng trống khả dụng theo khoảng thời gian và loại phòng (Room Availability Query)
+<a id="case-4"></a>
+### Case 4: Tra cứu phòng trống khả dụng theo khoảng thời gian và loại phòng (Room Availability Query)
 - Trường hợp sử dụng: Nhân viên tiếp nhận yêu cầu đặt phòng của khách hàng với các tiêu chí: Khoảng ngày lưu trú (Ngày nhận - Ngày trả) và Loại phòng mong muốn (sức chứa, đơn giá).
 - Mục đích: Xác định tập hợp các phòng vật lý đang không trong trạng thái bảo trì và hoàn toàn không bị trùng lịch với các đơn đặt phòng hiện hữu ('Đã đặt', 'Đã nhận phòng') trong cùng khoảng thời gian dự kiến.
 Lệnh chạy:
@@ -291,9 +339,12 @@ ORDER BY lp.GiaPhong ASC, p.SoPhong ASC;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Thực hiện kiểm tra tính khả dụng của phòng trước khi tiếp nhận đơn đặt phòng mới của khách hàng.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 5: Tiếp nhận khách làm thủ tục nhận phòng theo giao dịch toàn vẹn (Check-in Transaction)
+<a id="case-5"></a>
+### Case 5: Tiếp nhận khách làm thủ tục nhận phòng theo giao dịch toàn vẹn (Check-in Transaction)
 - Trường hợp sử dụng: Khách hàng đến quầy lễ tân xuất trình thông tin để thực hiện thủ tục nhận phòng (Check-in) theo đơn đặt phòng đã đăng ký trước đó.
 - Mục đích: Chuyển trạng thái đơn đặt phòng từ 'Đã đặt' sang 'Đã nhận phòng', đồng thời cập nhật đồng bộ trạng thái của tất cả các phòng vật lý tương ứng trong ChiTietDatPhong sang 'Đang sử dụng' trong một Transaction nguyên tử duy nhất.
 Lệnh chạy:
@@ -402,9 +453,12 @@ COMMIT;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Thực thi khi nhân viên lễ tân xác nhận hoàn tất thủ tục check-in trên hệ thống quản lý khách sạn.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 6: Ghi nhận thông tin khách hàng sử dụng dịch vụ phát sinh (Service Consumption Recording)
+<a id="case-6"></a>
+### Case 6: Ghi nhận thông tin khách hàng sử dụng dịch vụ phát sinh (Service Consumption Recording)
 - Trường hợp sử dụng: Khách hàng trong thời gian lưu trú tại khách sạn phát sinh nhu cầu sử dụng các dịch vụ gia tăng (ẩm thực, giặt là, spa, thuê xe).
 - Mục đích: Thiết lập bản ghi mới vào quan hệ liên kết ba ngôi CungCapDichVu kết nối Lần đặt phòng (DatPhong), Dịch vụ (DichVu), và Nhân viên dịch vụ phụ trách (NhanVienDichVu).
 Lệnh chạy:
@@ -511,9 +565,12 @@ COMMIT;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Được tích hợp vào các phân hệ POS ẩm thực, giặt là hoặc dịch vụ phòng của khách sạn.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 7: Giám sát buồng phòng và danh sách khách hàng đang lưu trú (In-House Guest & Room Monitoring)
+<a id="case-7"></a>
+### Case 7: Giám sát buồng phòng và danh sách khách hàng đang lưu trú (In-House Guest & Room Monitoring)
 - Trường hợp sử dụng: Bộ phận quản lý buồng phòng (Housekeeping) và Lễ tân theo dõi tình hình sử dụng phòng thực tế trong ngày phục vụ công tác điều phối nhân sự và dịch vụ phòng.
 - Mục đích: Truy xuất danh sách chi tiết các phòng vật lý đang có khách lưu trú, kết nối thông tin loại phòng, khách hàng đại diện, số đêm dự kiến và nhân viên lễ tân phụ trách tiếp nhận ban đầu.
 Lệnh chạy:
@@ -588,9 +645,12 @@ ORDER BY p.Tang ASC, p.SoPhong ASC;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Hỗ trợ công tác kiểm tra phòng hàng ngày và chuẩn bị kế hoạch dọn phòng đón khách mới.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 8: Tổng hợp lịch sử lưu trú và phân loại khách hàng trung thành (Customer 360 & Loyalty Profiling)
+<a id="case-8"></a>
+### Case 8: Tổng hợp lịch sử lưu trú và phân loại khách hàng trung thành (Customer 360 & Loyalty Profiling)
 - Trường hợp sử dụng: Phân tích giá trị vòng đời khách hàng phục vụ chính sách chăm sóc khách hàng thân thiết, áp dụng các mức chiết khấu và ưu đãi phù hợp.
 - Mục đích: Tổng hợp các chỉ số định lượng của khách hàng: Tổng số lần đặt phòng, tổng số đêm lưu trú tích lũy, tổng giá trị chi tiêu thực tế trên các hóa đơn đã thanh toán, và tự động xếp hạng thành viên bằng cấu trúc điều kiện.
 Lệnh chạy:
@@ -660,9 +720,12 @@ ORDER BY TongGiaTriChiTieu DESC;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Hỗ trợ chính sách chăm sóc khách hàng và cá nhân hóa trải nghiệm dịch vụ lưu trú.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 9: Bảng kê đối soát chi phí tiền phòng và dịch vụ trước thanh toán (Pre-bill Folio Audit)
+<a id="case-9"></a>
+### Case 9: Bảng kê đối soát chi phí tiền phòng và dịch vụ trước thanh toán (Pre-bill Folio Audit)
 - Trường hợp sử dụng: Được thực hiện trước thời điểm khách hàng thanh toán trả phòng: Bộ phận thu ngân in bảng kê tạm tính (Guest Folio) để khách hàng rà soát chi tiết các khoản phí trước khi lập hóa đơn chính thức.
 - Mục đích: Tính toán độc lập và chính xác: Tổng tiền phòng = `SUM(ctdp.DonGia) * Số đêm lưu trú`, Tổng tiền dịch vụ = `SUM(ccdv.SoLuong * dv.DonGia)`, bảo đảm không bị nhân đôi dữ liệu (Cartesian Product) khi kết nối các quan hệ 1-N.
 Lệnh chạy:
@@ -769,9 +832,12 @@ WHERE dp.MaDatPhong = @MaDatPhongFolio;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Hỗ trợ công tác kế toán thanh toán và giải trình chi tiết từng khoản thu với khách lưu trú.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 10: Xử lý thủ tục trả phòng và xuất hóa đơn thanh toán khép kín (Check-out & Billing Transaction)
+<a id="case-10"></a>
+### Case 10: Xử lý thủ tục trả phòng và xuất hóa đơn thanh toán khép kín (Check-out & Billing Transaction)
 - Trường hợp sử dụng: Khách hàng hoàn tất kỳ lưu trú và thực hiện thanh toán chi phí tại quầy thu ngân để kết thúc đơn đặt phòng.
 - Mục đích: Thực hiện chuỗi thao tác nguyên tử (Atomicity):
   1. Tự động tính toán tổng tiền phòng và tiền dịch vụ thực tế để ghi nhận vào thực thể HoaDon.
@@ -929,9 +995,12 @@ COMMIT;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Chốt doanh thu và đưa phòng trở lại trạng thái sẵn sàng đón khách mới trên hệ thống.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 11: Kế toán đối soát và phân bổ doanh thu theo phương thức thanh toán (Revenue Reconciliation by Payment Method)
+<a id="case-11"></a>
+### Case 11: Kế toán đối soát và phân bổ doanh thu theo phương thức thanh toán (Revenue Reconciliation by Payment Method)
 - Trường hợp sử dụng: Được thực hiện định kỳ cuối mỗi ca làm việc hoặc cuối ngày: Bộ phận kế toán kiểm tra và đối chiếu tổng số tiền thu được theo từng kênh thanh toán (Tiền mặt, Thẻ tín dụng, Chuyển khoản ngân hàng).
 - Mục đích: Đảm bảo tính chính xác giữa số liệu ghi nhận trên phần mềm với tiền mặt thực tế tại két quỹ và sao kê giao dịch từ cổng thanh toán/ngân hàng; hỗ trợ cập nhật thông tin nhân viên kế toán (MaNVKeToan) xác nhận đã kiểm toán hóa đơn.
 Lệnh chạy:
@@ -993,9 +1062,12 @@ ORDER BY DoanhThuThuan DESC;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Báo cáo tài chính định kỳ giúp quản lý nắm bắt xu hướng thanh toán của khách hàng.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 12: Báo cáo tổng hợp doanh thu theo thời gian phân tách theo cấu phần (Financial Revenue Breakdown Report)
+<a id="case-12"></a>
+### Case 12: Báo cáo tổng hợp doanh thu theo thời gian phân tách theo cấu phần (Financial Revenue Breakdown Report)
 - Trường hợp sử dụng: Phục vụ công tác lập báo cáo tài chính định kỳ của khách sạn theo các mốc thời gian: Tháng, Quý, Năm.
 - Mục đích: Phân tích cấu trúc doanh thu toàn diện: Bóc tách rành mạch các thành phần Doanh thu phòng, Doanh thu dịch vụ, Tiền phụ thu, Tiền giảm giá và xác định Doanh thu thuần cuối cùng (`TienPhong + TienDichVu + TienPhuThu - GiamGia`).
 Lệnh chạy:
@@ -1050,9 +1122,12 @@ ORDER BY Nam DESC, Thang DESC;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Dùng để xây dựng các biểu đồ phân tích tài chính trên giao diện báo cáo thông minh (BI Dashboard).
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 13: Thống kê và xếp hạng các dịch vụ mang lại doanh thu cao nhất (Top Profitable Services Analysis)
+<a id="case-13"></a>
+### Case 13: Thống kê và xếp hạng các dịch vụ mang lại doanh thu cao nhất (Top Profitable Services Analysis)
 - Trường hợp sử dụng: Phân tích danh mục sản phẩm dịch vụ gia tăng của khách sạn nhằm xác định các nhóm dịch vụ chủ lực và dịch vụ kém hiệu quả.
 - Mục đích: Xếp hạng các dịch vụ theo tổng doanh thu phát sinh và sản lượng tiêu thụ, tính toán tỷ trọng phần trăm đóng góp của từng dịch vụ trên tổng doanh thu dịch vụ chung.
 Lệnh chạy:
@@ -1130,9 +1205,12 @@ ORDER BY TongDoanhThuDichVu DESC;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Giúp tối ưu hóa vận hành cho các bộ phận nhà hàng, quầy bar và trung tâm spa.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 14: Thống kê tỷ lệ lấp đầy phòng và doanh thu trên mỗi phòng sẵn có (Occupancy Rate & RevPAR Analysis)
+<a id="case-14"></a>
+### Case 14: Thống kê tỷ lệ lấp đầy phòng và doanh thu trên mỗi phòng sẵn có (Occupancy Rate & RevPAR Analysis)
 - Trường hợp sử dụng: Đánh giá hiệu suất khai thác tài sản buồng phòng - chỉ số cốt lõi trong ngành quản trị khách sạn (Hospitality Management KPI).
 - Mục đích: Tính toán hai chỉ số vận hành tiêu chuẩn quốc tế theo từng Loại phòng:
   1. Tỷ lệ lấp đầy phòng (Occupancy Rate) = `(Số phòng có khách / Tổng số phòng) * 100%`.
@@ -1205,9 +1283,12 @@ ORDER BY RevPAR_VND DESC;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Báo cáo định kỳ phản ánh công suất khai thác hạ tầng buồng phòng của khách sạn.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 15: Đánh giá hiệu suất làm việc của nhân viên lễ tân theo doanh số xử lý (Front Desk Staff Productivity Evaluation)
+<a id="case-15"></a>
+### Case 15: Đánh giá hiệu suất làm việc của nhân viên lễ tân theo doanh số xử lý (Front Desk Staff Productivity Evaluation)
 - Trường hợp sử dụng: Phục vụ công tác đánh giá hiệu quả công việc (KPI) định kỳ của bộ phận nhân sự và quản lý tiền sảnh đối với nhân viên lễ tân.
 - Mục đích: Đo lường năng suất cụ thể của từng nhân viên lễ tân: Số lượng đơn đặt phòng đã tiếp nhận xử lý, số lượng hóa đơn thanh toán đã lập, và tổng giá trị doanh số thực tế mang lại cho khách sạn.
 Lệnh chạy:
@@ -1270,9 +1351,12 @@ ORDER BY TongDoanhSoLapHoaDon DESC;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Báo cáo định kỳ của phòng nhân sự hỗ trợ công tác quản trị nguồn nhân lực.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 16: Truy vấn phân cấp tổ chức nhân sự bằng đệ quy (Organizational Hierarchy with Recursive CTE)
+<a id="case-16"></a>
+### Case 16: Truy vấn phân cấp tổ chức nhân sự bằng đệ quy (Organizational Hierarchy with Recursive CTE)
 - Trường hợp sử dụng: Ban Giám đốc và Phòng Nhân sự cần kiểm tra toàn bộ sơ đồ phân cấp quản lý trong khách sạn: Xác định chuỗi chỉ huy từ Tổng quản lý đến các quản lý bộ phận và nhân viên cấp dưới trực thuộc.
 - Mục đích: Sử dụng kỹ thuật truy vấn đệ quy (Recursive CTE) để duyệt qua mối quan hệ tự tham chiếu (Self-referencing Foreign Key: `NhanVien.MaQuanLy -> QuanLy.MaNV`), hiển thị cấp bậc quản trị và chuỗi phân cấp nhân sự.
 Lệnh chạy:
@@ -1366,9 +1450,12 @@ ORDER BY CapBacQuanLy ASC, MaQuanLy ASC, MaNV ASC;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Mô hình hóa cấu trúc nhân sự và phân định quyền hạn trong hệ thống thông tin quản lý.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 17: Xử lý tình huống hủy đặt phòng và tự động hoàn trả trạng thái phòng (Booking Cancellation & Room Status Release)
+<a id="case-17"></a>
+### Case 17: Xử lý tình huống hủy đặt phòng và tự động hoàn trả trạng thái phòng (Booking Cancellation & Room Status Release)
 - Trường hợp sử dụng: Khách hàng liên hệ yêu cầu hủy đơn đặt phòng trước ngày nhận phòng theo chính sách hủy phòng của khách sạn.
 - Mục đích: Cập nhật trạng thái đơn đặt phòng sang 'Đã hủy', lưu vết lý do hủy, và tự động hoàn trả trạng thái của tất cả các phòng vật lý liên quan về 'Trống' để mở bán lại cho khách hàng khác.
 Lệnh chạy:
@@ -1451,9 +1538,12 @@ COMMIT;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Thao tác khi khách hàng thực hiện hủy phòng qua hotline hoặc cổng dịch vụ khách sạn.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 18: Xử lý tình huống đổi phòng lưu trú giữa chừng cho khách hàng (Room Transfer & Upgrade Handling)
+<a id="case-18"></a>
+### Case 18: Xử lý tình huống đổi phòng lưu trú giữa chừng cho khách hàng (Room Transfer & Upgrade Handling)
 - Trường hợp sử dụng: Khách hàng đang trong kỳ lưu trú có nhu cầu chuyển sang một phòng khác (do sự cố tiện nghi phòng cũ hoặc có nhu cầu nâng cấp lên loại phòng cao cấp hơn).
 - Mục đích: Thực hiện việc hoán đổi phòng: Kiểm tra phòng mới có sẵn sàng hay không, thay thế bản ghi trong quan hệ yếu ChiTietDatPhong, cập nhật lại đơn giá thỏa thuận mới, hoàn trả phòng cũ về 'Trống' và khóa phòng mới sang 'Đang sử dụng'.
 Lệnh chạy:
@@ -1554,9 +1644,12 @@ COMMIT;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Đáp ứng nhu cầu thay đổi phòng nghỉ của khách hàng trong quá trình lưu trú.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 19: Xử lý tình huống gia hạn thời gian lưu trú và kiểm tra xung đột lịch đặt (Stay Extension & Overlap Verification)
+<a id="case-19"></a>
+### Case 19: Xử lý tình huống gia hạn thời gian lưu trú và kiểm tra xung đột lịch đặt (Stay Extension & Overlap Verification)
 - Trường hợp sử dụng: Khách hàng đang lưu trú tại khách sạn có nhu cầu kéo dài thêm kỳ nghỉ so với ngày trả phòng dự kiến ban đầu.
 - Mục đích: Kiểm tra xem trong khoảng thời gian gia hạn mới có phát sinh xung đột với bất kỳ đơn đặt phòng nào khác trong tương lai đối với cùng các phòng vật lý đó hay không. Nếu không xung đột -> Cho phép cập nhật gia hạn ngày trả phòng. Nếu có xung đột -> Cảnh báo từ chối.
 Lệnh chạy:
@@ -1662,9 +1755,12 @@ COMMIT;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Xử lý các tình huống khách hàng muốn kéo dài kỳ nghỉ phát sinh tại quầy tiếp tân.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 20: Kiểm soát tranh chấp đặt phòng đồng thời bằng khóa mức dòng (Concurrency Control & Overbooking Prevention)
+<a id="case-20"></a>
+### Case 20: Kiểm soát tranh chấp đặt phòng đồng thời bằng khóa mức dòng (Concurrency Control & Overbooking Prevention)
 - Trường hợp sử dụng: Nhiều luồng giao dịch đồng thời (ví dụ: Hai khách hàng trên website hoặc nhân viên lễ tân tại quầy) cùng chọn đặt một phòng vật lý cho cùng một khoảng ngày.
 - Mục đích: Áp dụng cơ chế khóa mức dòng bi quan (Pessimistic Row-level Locking):
   - T-SQL: `WITH (UPDLOCK, HOLDLOCK)`
@@ -1754,9 +1850,12 @@ COMMIT;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Áp dụng trong các dịch vụ API xử lý đặt giữ phòng tại các thời điểm cao điểm mùa du lịch.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 21: Phát hiện sai lệch số liệu và cảnh báo bất thường trên hóa đơn (Billing Discrepancy & Anomaly Detection)
+<a id="case-21"></a>
+### Case 21: Phát hiện sai lệch số liệu và cảnh báo bất thường trên hóa đơn (Billing Discrepancy & Anomaly Detection)
 - Trường hợp sử dụng: Phục vụ công tác kiểm soát nội bộ và thanh tra tài chính: Rà soát toàn bộ các hóa đơn đã lập để phát hiện các dấu hiệu sai lệch số tiền hoặc gian lận thu chi.
 - Mục đích: So sánh độc lập số tiền lưu vết trên thực thể HoaDon với số tiền tính toán lại từ các thực thể gốc:
   1. Tiền phòng trên hóa đơn so với `SUM(ctdp.DonGia) * Số đêm`.
@@ -1890,9 +1989,12 @@ WHERE (TienPhongHoaDon <> TienPhongChuan)
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Báo cáo định kỳ phục vụ công tác thanh tra kiểm toán kế toán của doanh nghiệp.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 22: Xử lý cập nhật thông tin nhân viên nghỉ việc và chuyển giao quyền quản lý (Employee Termination & Soft-Delete Reassignment)
+<a id="case-22"></a>
+### Case 22: Xử lý cập nhật thông tin nhân viên nghỉ việc và chuyển giao quyền quản lý (Employee Termination & Soft-Delete Reassignment)
 - Trường hợp sử dụng: Một nhân viên giữ chức vụ Quản lý (ví dụ: NV004) hoàn tất thủ tục thôi việc tại khách sạn.
 - Mục đích: 1. Thực hiện xóa mềm (Soft-Delete) bằng cách cập nhật `TrangThai = N'Nghỉ việc'`, ngăn chặn tài khoản này tiếp tục tham gia xử lý đặt phòng hoặc hóa đơn mới.
 2. Tái cấu trúc chuỗi quản lý: Chuyển giao toàn bộ nhân viên cấp dưới trực thuộc của người nghỉ việc sang cho Quản lý kế nhiệm (ví dụ: NV001), bảo tồn tính toàn vẹn của cây tổ chức nhân sự.
@@ -1970,9 +2072,12 @@ COMMIT;
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Quy trình bàn giao công việc khi nhân sự quản lý rời bỏ doanh nghiệp.
 
+[⬆ Về mục lục](#muc-luc)
+
 ---
 
-Case 23: Khóa bảo trì phòng đột xuất và điều phối các đơn đặt phòng bị ảnh hưởng (Emergency Room Maintenance & Rescheduling)
+<a id="case-23"></a>
+### Case 23: Khóa bảo trì phòng đột xuất và điều phối các đơn đặt phòng bị ảnh hưởng (Emergency Room Maintenance & Rescheduling)
 - Trường hợp sử dụng: Phòng vật lý (ví dụ: P010) phát sinh sự cố kỹ thuật đột xuất (rò rỉ ống nước, chập điện) đòi hỏi phải tạm ngừng phục vụ để sửa chữa.
 - Mục đích: 1. Chuyển trạng thái phòng sang 'Đang bảo trì' để ngăn chặn các lượt đặt phòng mới.
 2. Rà soát và lập danh sách tất cả các đơn đặt phòng trong tương lai đã gán phòng P010 để bộ phận tiếp tân chủ động liên hệ điều chuyển khách hàng sang các phòng tương đương.
@@ -2078,5 +2183,7 @@ COMMIT;
 --   2. Lập danh sách cảnh báo các booking tương lai bị ảnh hưởng để phục vụ điều chuyển phòng.
 -- Dùng trong trường hợp thực tế như thế nào:
 --   - Ứng dụng khi bộ phận kỹ thuật thông báo sự cố hỏng hóc cần cách ly phòng sửa chữa.
+
+[⬆ Về mục lục](#muc-luc)
 
 ---
