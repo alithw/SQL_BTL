@@ -353,7 +353,12 @@ Microsoft SQL Server:
 -- Giao dịch nhận phòng đảm bảo tính toàn vẹn ACID
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongCheckIn VARCHAR(10) = 'DP0039';
+    -- Tự động lấy đơn đặt phòng hợp lệ đang ở trạng thái 'Đã đặt' để làm thủ tục nhận phòng
+    DECLARE @MaDatPhongCheckIn VARCHAR(10);
+    SELECT TOP 1 @MaDatPhongCheckIn = MaDatPhong 
+    FROM DatPhong 
+    WHERE TrangThai = N'Đã đặt'
+    ORDER BY NgayNhanDuKien ASC;
 
     -- 1. Kiểm tra tính hợp lệ của đơn đặt phòng
     IF NOT EXISTS (
@@ -414,7 +419,12 @@ MySQL:
 -- Thủ tục nhận phòng (Check-in) trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongCheckIn = 'DP0039';
+-- Tự động lấy đơn đặt phòng hợp lệ đang ở trạng thái 'Đã đặt'
+SELECT MaDatPhong INTO @MaDatPhongCheckIn 
+FROM DatPhong 
+WHERE TrangThai = 'Đã đặt' 
+ORDER BY NgayNhanDuKien ASC 
+LIMIT 1;
 
 -- 1. Kiểm tra trạng thái hiện tại của đơn đặt phòng
 SELECT TrangThai INTO @CurrentStatus
@@ -467,9 +477,19 @@ Microsoft SQL Server:
 -- Ghi nhận sử dụng dịch vụ cho đơn đặt phòng đang lưu trú
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongSD VARCHAR(10) = 'DP0001';
-    DECLARE @MaDVOrder VARCHAR(10) = 'DV06';
-    DECLARE @MaNVDichVuOrder VARCHAR(10) = 'NV045';
+    -- Tự động lấy đơn đặt phòng đang lưu trú, dịch vụ đang mở và nhân viên dịch vụ đang làm việc
+    DECLARE @MaDatPhongSD VARCHAR(10);
+    SELECT TOP 1 @MaDatPhongSD = MaDatPhong FROM DatPhong WHERE TrangThai = N'Đã nhận phòng' ORDER BY NgayNhanDuKien ASC;
+
+    DECLARE @MaDVOrder VARCHAR(10);
+    SELECT TOP 1 @MaDVOrder = MaDV FROM DichVu WHERE TrangThai = N'Đang cung cấp' ORDER BY MaDV ASC;
+
+    DECLARE @MaNVDichVuOrder VARCHAR(10);
+    SELECT TOP 1 @MaNVDichVuOrder = nv.MaNV 
+    FROM NhanVien nv 
+    INNER JOIN NhanVienDichVu nvdv ON nv.MaNV = nvdv.MaNV 
+    WHERE nv.TrangThai = N'Đang làm' 
+    ORDER BY nv.MaNV ASC;
     DECLARE @SoLuongOrder INT = 2;
     DECLARE @GhiChuOrder NVARCHAR(200) = N'Khách gọi dịch vụ phục vụ tận phòng';
 
@@ -539,9 +559,10 @@ MySQL:
 -- Ghi nhận sử dụng dịch vụ trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongSD = 'DP0001';
-SET @MaDVOrder = 'DV06';
-SET @MaNVDichVuOrder = 'NV045';
+-- Tự động lấy đơn đặt phòng đang lưu trú, dịch vụ đang mở và nhân viên dịch vụ đang làm việc
+SELECT MaDatPhong INTO @MaDatPhongSD FROM DatPhong WHERE TrangThai = 'Đã nhận phòng' ORDER BY NgayNhanDuKien ASC LIMIT 1;
+SELECT MaDV INTO @MaDVOrder FROM DichVu WHERE TrangThai = 'Đang cung cấp' ORDER BY MaDV ASC LIMIT 1;
+SELECT nv.MaNV INTO @MaNVDichVuOrder FROM NhanVien nv INNER JOIN NhanVienDichVu nvdv ON nv.MaNV = nvdv.MaNV WHERE nv.TrangThai = 'Đang làm' ORDER BY nv.MaNV ASC LIMIT 1;
 SET @SoLuongOrder = 2;
 SET @GhiChuOrder = 'Khách gọi dịch vụ phục vụ tận phòng';
 
@@ -740,7 +761,12 @@ Lệnh chạy:
 Microsoft SQL Server:
 ```sql
 -- Bảng kê tạm tính chi phí lưu trú và dịch vụ trước khi lập hóa đơn
-DECLARE @MaDatPhongFolio VARCHAR(10) = 'DP0001';
+-- Tự động lấy đơn đặt phòng đang có khách lưu trú để xuất bảng kê chi phí trước thanh toán
+DECLARE @MaDatPhongFolio VARCHAR(10);
+SELECT TOP 1 @MaDatPhongFolio = MaDatPhong 
+FROM DatPhong 
+WHERE TrangThai = N'Đã nhận phòng'
+ORDER BY NgayNhanDuKien ASC;
 
 WITH TienPhongCTE AS (
     -- Tính tiền phòng dựa trên đơn giá chốt trong hợp đồng đặt phòng và số đêm lưu trú
@@ -793,7 +819,12 @@ GO
 MySQL:
 ```sql
 -- Bảng kê tạm tính chi phí trong MySQL
-SET @MaDatPhongFolio = 'DP0001';
+-- Tự động lấy đơn đặt phòng đang có khách lưu trú để xuất bảng kê chi phí trước thanh toán
+SELECT MaDatPhong INTO @MaDatPhongFolio 
+FROM DatPhong 
+WHERE TrangThai = 'Đã nhận phòng' 
+ORDER BY NgayNhanDuKien ASC 
+LIMIT 1;
 
 WITH TienPhongCTE AS (
     SELECT 
@@ -857,8 +888,20 @@ Microsoft SQL Server:
 -- Giao dịch trả phòng, quyết toán và xuất hóa đơn thanh toán
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongCheckout VARCHAR(10) = 'DP0001';
-    DECLARE @MaNVLapCheckout VARCHAR(10) = 'NV021';
+    -- Tự động lấy đơn đặt phòng đang lưu trú chưa lập hóa đơn và nhân viên lễ tân đang làm việc
+    DECLARE @MaDatPhongCheckout VARCHAR(10);
+    SELECT TOP 1 @MaDatPhongCheckout = dp.MaDatPhong 
+    FROM DatPhong dp
+    WHERE dp.TrangThai = N'Đã nhận phòng'
+      AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong)
+    ORDER BY dp.NgayNhanDuKien ASC;
+
+    DECLARE @MaNVLapCheckout VARCHAR(10);
+    SELECT TOP 1 @MaNVLapCheckout = nv.MaNV 
+    FROM NhanVien nv
+    INNER JOIN LeTan lt ON nv.MaNV = lt.MaNV
+    WHERE nv.TrangThai = N'Đang làm'
+    ORDER BY nv.MaNV ASC;
     DECLARE @TienPhuThuInput DECIMAL(15,0) = 100000;
     DECLARE @GiamGiaInput DECIMAL(15,0) = 50000;
     DECLARE @PhuongThucInput NVARCHAR(20) = N'Chuyển khoản';
@@ -950,8 +993,20 @@ MySQL:
 -- Thủ tục thanh toán và trả phòng trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongCheckout = 'DP0001';
-SET @MaNVLapCheckout = 'NV021';
+-- Tự động lấy đơn đặt phòng đang lưu trú chưa lập hóa đơn và nhân viên lễ tân đang làm việc
+SELECT dp.MaDatPhong INTO @MaDatPhongCheckout 
+FROM DatPhong dp
+WHERE dp.TrangThai = 'Đã nhận phòng'
+  AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong)
+ORDER BY dp.NgayNhanDuKien ASC 
+LIMIT 1;
+
+SELECT nv.MaNV INTO @MaNVLapCheckout 
+FROM NhanVien nv
+INNER JOIN LeTan lt ON nv.MaNV = lt.MaNV
+WHERE nv.TrangThai = 'Đang làm'
+ORDER BY nv.MaNV ASC 
+LIMIT 1;
 SET @TienPhuThuInput = 100000;
 SET @GiamGiaInput = 50000;
 SET @PhuongThucInput = 'Chuyển khoản';
@@ -962,7 +1017,7 @@ INTO @MaHDNew
 FROM HoaDon;
 
 -- 1. Tính toán tiền phòng
-SELECT SUM(ctdp.DonGia) * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien)
+SELECT SUM(ctdp.DonGia * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien))
 INTO @CalcTienPhong
 FROM DatPhong dp
 INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
@@ -1480,7 +1535,12 @@ Microsoft SQL Server:
 -- Xử lý nghiệp vụ Hủy đặt phòng đảm bảo an toàn trạng thái phòng
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongCancel VARCHAR(10) = 'DP0039';
+    -- Tự động lấy đơn đặt phòng đang ở trạng thái 'Đã đặt' để hủy
+    DECLARE @MaDatPhongCancel VARCHAR(10);
+    SELECT TOP 1 @MaDatPhongCancel = MaDatPhong 
+    FROM DatPhong 
+    WHERE TrangThai = N'Đã đặt'
+    ORDER BY NgayDat DESC;
     DECLARE @LyDoHuy NVARCHAR(200) = N'Khách hàng thông báo hủy chuyến đi trước hạn';
 
     -- 1. Kiểm tra trạng thái hợp lệ của đơn đặt phòng
@@ -1528,7 +1588,12 @@ MySQL:
 -- Hủy đặt phòng và hoàn trả trạng thái phòng trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongCancel = 'DP0039';
+-- Tự động lấy đơn đặt phòng đang ở trạng thái 'Đã đặt' để hủy
+SELECT MaDatPhong INTO @MaDatPhongCancel 
+FROM DatPhong 
+WHERE TrangThai = 'Đã đặt' 
+ORDER BY NgayDat DESC 
+LIMIT 1;
 SET @LyDoHuy = 'Khách hàng thông báo hủy chuyến đi trước hạn';
 
 -- 1. Cập nhật trạng thái đơn đặt phòng
@@ -1568,9 +1633,23 @@ Microsoft SQL Server:
 -- Xử lý nghiệp vụ chuyển phòng lưu trú giữa chừng cho khách hàng
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongDoi VARCHAR(10) = 'DP0001';
-    DECLARE @MaPhongHienTai VARCHAR(10) = 'P001';
-    DECLARE @MaPhongChuyenDen VARCHAR(10) = 'P002';
+    -- Tự động lấy đơn đang lưu trú và phòng hiện tại của đơn đó
+    DECLARE @MaDatPhongDoi VARCHAR(10);
+    DECLARE @MaPhongHienTai VARCHAR(10);
+    SELECT TOP 1 
+        @MaDatPhongDoi = dp.MaDatPhong,
+        @MaPhongHienTai = ctdp.MaPhong
+    FROM DatPhong dp
+    INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
+    WHERE dp.TrangThai = N'Đã nhận phòng'
+    ORDER BY dp.NgayNhanDuKien ASC;
+
+    -- Tự động lấy một phòng trống khả dụng khác để chuyển đến
+    DECLARE @MaPhongChuyenDen VARCHAR(10);
+    SELECT TOP 1 @MaPhongChuyenDen = MaPhong 
+    FROM Phong 
+    WHERE TrangThai = N'Trống' AND MaPhong <> @MaPhongHienTai
+    ORDER BY MaPhong ASC;
 
     -- 1. Kiểm tra phòng mới có đang thực sự ở trạng thái 'Trống' hay không
     IF NOT EXISTS (SELECT 1 FROM Phong WHERE MaPhong = @MaPhongChuyenDen AND TrangThai = N'Trống')
@@ -1626,9 +1705,21 @@ MySQL:
 -- Xử lý chuyển đổi phòng trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongDoi = 'DP0001';
-SET @MaPhongHienTai = 'P001';
-SET @MaPhongChuyenDen = 'P002';
+-- Tự động lấy đơn đang lưu trú và phòng hiện tại của đơn đó
+SELECT dp.MaDatPhong, ctdp.MaPhong 
+INTO @MaDatPhongDoi, @MaPhongHienTai
+FROM DatPhong dp
+INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
+WHERE dp.TrangThai = 'Đã nhận phòng'
+ORDER BY dp.NgayNhanDuKien ASC 
+LIMIT 1;
+
+-- Tự động lấy phòng trống sẵn sàng để chuyển đến
+SELECT MaPhong INTO @MaPhongChuyenDen 
+FROM Phong 
+WHERE TrangThai = 'Trống' AND MaPhong <> @MaPhongHienTai
+ORDER BY MaPhong ASC 
+LIMIT 1;
 
 -- Lấy đơn giá phòng mới
 SELECT lp.GiaPhong INTO @DonGiaMoi
@@ -1674,8 +1765,15 @@ Microsoft SQL Server:
 -- Xử lý gia hạn thời gian lưu trú có kiểm tra xung đột lịch đặt tương lai
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongGiaHan VARCHAR(10) = 'DP0001';
-    DECLARE @NgayTraMoi DATE = '2026-07-06';
+    -- Tự động lấy đơn đặt phòng đang lưu trú và tính ngày trả mới gia hạn thêm 2 ngày
+    DECLARE @MaDatPhongGiaHan VARCHAR(10);
+    DECLARE @NgayTraMoi DATE;
+    SELECT TOP 1 
+        @MaDatPhongGiaHan = MaDatPhong,
+        @NgayTraMoi = DATEADD(DAY, 2, NgayTraDuKien)
+    FROM DatPhong 
+    WHERE TrangThai = N'Đã nhận phòng'
+    ORDER BY NgayNhanDuKien ASC;
 
     DECLARE @NgayTraCu DATE;
     SELECT @NgayTraCu = NgayTraDuKien 
@@ -1736,8 +1834,13 @@ MySQL:
 -- Gia hạn lưu trú trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongGiaHan = 'DP0001';
-SET @NgayTraMoi = '2026-07-06';
+-- Tự động lấy đơn đặt phòng đang lưu trú và tính ngày trả mới gia hạn thêm 2 ngày
+SELECT MaDatPhong, DATE_ADD(NgayTraDuKien, INTERVAL 2 DAY)
+INTO @MaDatPhongGiaHan, @NgayTraMoi
+FROM DatPhong 
+WHERE TrangThai = 'Đã nhận phòng'
+ORDER BY NgayNhanDuKien ASC 
+LIMIT 1;
 
 SELECT NgayTraDuKien INTO @NgayTraCu
 FROM DatPhong 
@@ -1788,7 +1891,12 @@ Microsoft SQL Server:
 -- Kiểm soát tranh chấp đặt phòng đồng thời bằng cơ chế khóa bi quan
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaPhongChon VARCHAR(10) = 'P005';
+    -- Tự động chọn một phòng đang hoạt động bình thường
+    DECLARE @MaPhongChon VARCHAR(10);
+    SELECT TOP 1 @MaPhongChon = MaPhong 
+    FROM Phong 
+    WHERE TrangThai <> N'Đang bảo trì'
+    ORDER BY MaPhong ASC;
     DECLARE @NgayNhanBooking DATE = '2026-11-10';
     DECLARE @NgayTraBooking DATE = '2026-11-15';
 
@@ -1835,7 +1943,12 @@ MySQL:
 -- Ngăn chặn tranh chấp đặt phòng đồng thời trong MySQL bằng SELECT ... FOR UPDATE
 START TRANSACTION;
 
-SET @MaPhongChon = 'P005';
+-- Tự động chọn một phòng đang hoạt động bình thường
+SELECT MaPhong INTO @MaPhongChon 
+FROM Phong 
+WHERE TrangThai <> 'Đang bảo trì' 
+ORDER BY MaPhong ASC 
+LIMIT 1;
 SET @NgayNhanBooking = '2026-11-10';
 SET @NgayTraBooking = '2026-11-15';
 
@@ -1893,7 +2006,7 @@ WITH TinhToanChuanCTE AS (
         (hd.TienPhong + hd.TienDichVu + hd.TienPhuThu - hd.GiamGia) AS TongTienThucThu,
         -- Tính toán lại tiền phòng chuẩn từ ChiTietDatPhong
         (
-            SELECT SUM(ctdp.DonGia) * DATEDIFF(DAY, dp.NgayNhanDuKien, dp.NgayTraDuKien)
+            SELECT SUM(ctdp.DonGia * DATEDIFF(DAY, dp.NgayNhanDuKien, dp.NgayTraDuKien))
             FROM DatPhong dp
             INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
             WHERE dp.MaDatPhong = hd.MaDatPhong
@@ -1957,7 +2070,7 @@ WITH TinhToanChuanCTE AS (
         hd.GiamGia,
         (hd.TienPhong + hd.TienDichVu + hd.TienPhuThu - hd.GiamGia) AS TongTienThucThu,
         (
-            SELECT SUM(ctdp.DonGia) * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien)
+            SELECT SUM(ctdp.DonGia * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien))
             FROM DatPhong dp
             INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
             WHERE dp.MaDatPhong = hd.MaDatPhong
@@ -2020,8 +2133,20 @@ Microsoft SQL Server:
 -- Xử lý an toàn khi Quản lý nghỉ việc và chuyển giao nhân sự trực thuộc
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaNVNghiViec VARCHAR(10) = 'NV004';
-    DECLARE @MaQuanLyKeNhiem VARCHAR(10) = 'NV001';
+    -- Tự động lấy một quản lý đang có cấp dưới trực thuộc
+    DECLARE @MaNVNghiViec VARCHAR(10);
+    SELECT TOP 1 @MaNVNghiViec = ql.MaNV
+    FROM QuanLy ql
+    INNER JOIN NhanVien nv ON ql.MaNV = nv.MaQuanLy
+    WHERE nv.TrangThai = N'Đang làm'
+    ORDER BY ql.MaNV DESC;
+
+    -- Tự động lấy một quản lý khác đang làm việc để kế nhiệm
+    DECLARE @MaQuanLyKeNhiem VARCHAR(10);
+    SELECT TOP 1 @MaQuanLyKeNhiem = MaNV 
+    FROM QuanLy 
+    WHERE MaNV <> @MaNVNghiViec
+    ORDER BY MaNV ASC;
 
     -- 1. Kiểm tra tính hợp lệ của Quản lý kế nhiệm
     IF NOT EXISTS (
@@ -2066,8 +2191,20 @@ MySQL:
 -- Xử lý nhân sự nghỉ việc trong MySQL
 START TRANSACTION;
 
-SET @MaNVNghiViec = 'NV004';
-SET @MaQuanLyKeNhiem = 'NV001';
+-- Tự động lấy một quản lý đang có cấp dưới trực thuộc
+SELECT ql.MaNV INTO @MaNVNghiViec
+FROM QuanLy ql
+INNER JOIN NhanVien nv ON ql.MaNV = nv.MaQuanLy
+WHERE nv.TrangThai = 'Đang làm'
+ORDER BY ql.MaNV DESC 
+LIMIT 1;
+
+-- Tự động lấy một quản lý khác đang làm việc để kế nhiệm
+SELECT MaNV INTO @MaQuanLyKeNhiem 
+FROM QuanLy 
+WHERE MaNV <> @MaNVNghiViec
+ORDER BY MaNV ASC 
+LIMIT 1;
 
 -- 1. Cập nhật trạng thái nghỉ việc (Xóa mềm)
 UPDATE NhanVien 
@@ -2103,7 +2240,12 @@ Microsoft SQL Server:
 -- Khóa bảo trì phòng khẩn cấp và tìm kiếm các đơn đặt phòng tương lai bị ảnh hưởng
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaPhongBaoTri VARCHAR(10) = 'P010';
+    -- Tự động lấy một phòng đang trống để khóa bảo trì đột xuất
+    DECLARE @MaPhongBaoTri VARCHAR(10);
+    SELECT TOP 1 @MaPhongBaoTri = MaPhong 
+    FROM Phong 
+    WHERE TrangThai = N'Trống'
+    ORDER BY MaPhong ASC;
     DECLARE @LyDoBaoTri NVARCHAR(200) = N'Khóa bảo trì đột xuất do sự cố kỹ thuật';
 
     -- 1. Kiểm tra trạng thái hiện tại: Ngăn chặn khóa phòng nếu đang có khách lưu trú
@@ -2160,7 +2302,12 @@ MySQL:
 -- Khóa bảo trì phòng và tìm các đơn đặt phòng bị ảnh hưởng trong MySQL
 START TRANSACTION;
 
-SET @MaPhongBaoTri = 'P010';
+-- Tự động lấy một phòng đang trống để khóa bảo trì đột xuất
+SELECT MaPhong INTO @MaPhongBaoTri 
+FROM Phong 
+WHERE TrangThai = 'Trống' 
+ORDER BY MaPhong ASC 
+LIMIT 1;
 SET @LyDoBaoTri = 'Khóa bảo trì đột xuất do sự cố kỹ thuật';
 
 -- 1. Cập nhật trạng thái phòng sang 'Đang bảo trì' nếu không có khách đang ở

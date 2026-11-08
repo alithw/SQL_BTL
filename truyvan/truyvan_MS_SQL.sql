@@ -205,7 +205,12 @@ GO
 -- Giao dịch nhận phòng đảm bảo tính toàn vẹn ACID
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongCheckIn VARCHAR(10) = 'DP0039';
+    -- Tự động lấy đơn đặt phòng hợp lệ đang ở trạng thái 'Đã đặt' để làm thủ tục nhận phòng
+    DECLARE @MaDatPhongCheckIn VARCHAR(10);
+    SELECT TOP 1 @MaDatPhongCheckIn = MaDatPhong 
+    FROM DatPhong 
+    WHERE TrangThai = N'Đã đặt'
+    ORDER BY NgayNhanDuKien ASC;
 
     -- 1. Kiểm tra tính hợp lệ của đơn đặt phòng
     IF NOT EXISTS (
@@ -276,9 +281,19 @@ GO
 -- Ghi nhận sử dụng dịch vụ cho đơn đặt phòng đang lưu trú
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongSD VARCHAR(10) = 'DP0001';
-    DECLARE @MaDVOrder VARCHAR(10) = 'DV06';
-    DECLARE @MaNVDichVuOrder VARCHAR(10) = 'NV045';
+    -- Tự động lấy đơn đặt phòng đang lưu trú, dịch vụ đang mở và nhân viên dịch vụ đang làm việc
+    DECLARE @MaDatPhongSD VARCHAR(10);
+    SELECT TOP 1 @MaDatPhongSD = MaDatPhong FROM DatPhong WHERE TrangThai = N'Đã nhận phòng' ORDER BY NgayNhanDuKien ASC;
+
+    DECLARE @MaDVOrder VARCHAR(10);
+    SELECT TOP 1 @MaDVOrder = MaDV FROM DichVu WHERE TrangThai = N'Đang cung cấp' ORDER BY MaDV ASC;
+
+    DECLARE @MaNVDichVuOrder VARCHAR(10);
+    SELECT TOP 1 @MaNVDichVuOrder = nv.MaNV 
+    FROM NhanVien nv 
+    INNER JOIN NhanVienDichVu nvdv ON nv.MaNV = nvdv.MaNV 
+    WHERE nv.TrangThai = N'Đang làm' 
+    ORDER BY nv.MaNV ASC;
     DECLARE @SoLuongOrder INT = 2;
     DECLARE @GhiChuOrder NVARCHAR(200) = N'Khách gọi dịch vụ phục vụ tận phòng';
 
@@ -437,7 +452,12 @@ GO
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ DECLARE đến GO) rồi nhấn F5.
 -- ==========================================================================================
 -- Bảng kê tạm tính chi phí lưu trú và dịch vụ trước khi lập hóa đơn
-DECLARE @MaDatPhongFolio VARCHAR(10) = 'DP0001';
+-- Tự động lấy đơn đặt phòng đang có khách lưu trú để xuất bảng kê chi phí trước thanh toán
+DECLARE @MaDatPhongFolio VARCHAR(10);
+SELECT TOP 1 @MaDatPhongFolio = MaDatPhong 
+FROM DatPhong 
+WHERE TrangThai = N'Đã nhận phòng'
+ORDER BY NgayNhanDuKien ASC;
 
 WITH TienPhongCTE AS (
     -- Tính tiền phòng dựa trên đơn giá chốt trong hợp đồng đặt phòng và số đêm lưu trú
@@ -492,9 +512,9 @@ GO
 -- CASE 10: Xử lý thủ tục trả phòng và xuất hóa đơn thanh toán khép kín (Check-out & Billing Transaction)
 -- TRƯỜNG HỢP SỬ DỤNG: Khách hàng hoàn tất kỳ lưu trú và thực hiện thanh toán chi phí tại quầy thu ngân để kết thúc đơn đặt phòng.
 -- MỤC ĐÍCH: Thực hiện chuỗi thao tác nguyên tử (Atomicity):
-  1. Tự động tính toán tổng tiền phòng và tiền dịch vụ thực tế để ghi nhận vào thực thể HoaDon.
-  2. Cập nhật trạng thái DatPhong sang 'Đã hoàn thành'.
-  3. Giải phóng tất cả các phòng vật lý trong ChiTietDatPhong về trạng thái 'Trống' để tiếp tục đón lượt khách kế tiếp.
+--   1. Tự động tính toán tổng tiền phòng và tiền dịch vụ thực tế để ghi nhận vào thực thể HoaDon.
+--   2. Cập nhật trạng thái DatPhong sang 'Đã hoàn thành'.
+--   3. Giải phóng tất cả các phòng vật lý trong ChiTietDatPhong về trạng thái 'Trống' để tiếp tục đón lượt khách kế tiếp.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   1. Vi phạm ràng buộc duy nhất (UQ_HoaDon_DatPhong): Mỗi đơn đặt phòng chỉ có duy nhất một hóa đơn thanh toán. Ngăn chặn việc xuất hóa đơn trùng lặp.
 --   2. Kiểm soát ràng buộc CK_HoaDon_TongTien: Tổng tiền thanh toán (TienPhong + TienDichVu + TienPhuThu - GiamGia) không được nhỏ hơn 0.
@@ -503,8 +523,20 @@ GO
 -- Giao dịch trả phòng, quyết toán và xuất hóa đơn thanh toán
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongCheckout VARCHAR(10) = 'DP0001';
-    DECLARE @MaNVLapCheckout VARCHAR(10) = 'NV021';
+    -- Tự động lấy đơn đặt phòng đang lưu trú chưa lập hóa đơn và nhân viên lễ tân đang làm việc
+    DECLARE @MaDatPhongCheckout VARCHAR(10);
+    SELECT TOP 1 @MaDatPhongCheckout = dp.MaDatPhong 
+    FROM DatPhong dp
+    WHERE dp.TrangThai = N'Đã nhận phòng'
+      AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong)
+    ORDER BY dp.NgayNhanDuKien ASC;
+
+    DECLARE @MaNVLapCheckout VARCHAR(10);
+    SELECT TOP 1 @MaNVLapCheckout = nv.MaNV 
+    FROM NhanVien nv
+    INNER JOIN LeTan lt ON nv.MaNV = lt.MaNV
+    WHERE nv.TrangThai = N'Đang làm'
+    ORDER BY nv.MaNV ASC;
     DECLARE @TienPhuThuInput DECIMAL(15,0) = 100000;
     DECLARE @GiamGiaInput DECIMAL(15,0) = 50000;
     DECLARE @PhuongThucInput NVARCHAR(20) = N'Chuyển khoản';
@@ -711,8 +743,8 @@ GO
 -- CASE 14: Thống kê tỷ lệ lấp đầy phòng và doanh thu trên mỗi phòng sẵn có (Occupancy Rate & RevPAR Analysis)
 -- TRƯỜNG HỢP SỬ DỤNG: Đánh giá hiệu suất khai thác tài sản buồng phòng - chỉ số cốt lõi trong ngành quản trị khách sạn (Hospitality Management KPI).
 -- MỤC ĐÍCH: Tính toán hai chỉ số vận hành tiêu chuẩn quốc tế theo từng Loại phòng:
-  1. Tỷ lệ lấp đầy phòng (Occupancy Rate) = `(Số phòng có khách / Tổng số phòng) * 100%`.
-  2. Doanh thu trên mỗi phòng sẵn có (RevPAR) = `Tỷ lệ lấp đầy * Đơn giá niêm yết`.
+--   1. Tỷ lệ lấp đầy phòng (Occupancy Rate) = `(Số phòng có khách / Tổng số phòng) * 100%`.
+--   2. Doanh thu trên mỗi phòng sẵn có (RevPAR) = `Tỷ lệ lấp đầy * Đơn giá niêm yết`.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Tránh lỗi chia cho 0 (Division by zero) đối với các loại phòng chưa có phòng vật lý nào được kích hoạt thông qua hàm NULLIF.
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ DECLARE đến GO) rồi nhấn F5.
@@ -856,7 +888,12 @@ GO
 -- Xử lý nghiệp vụ Hủy đặt phòng đảm bảo an toàn trạng thái phòng
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongCancel VARCHAR(10) = 'DP0039';
+    -- Tự động lấy đơn đặt phòng đang ở trạng thái 'Đã đặt' để hủy
+    DECLARE @MaDatPhongCancel VARCHAR(10);
+    SELECT TOP 1 @MaDatPhongCancel = MaDatPhong 
+    FROM DatPhong 
+    WHERE TrangThai = N'Đã đặt'
+    ORDER BY NgayDat DESC;
     DECLARE @LyDoHuy NVARCHAR(200) = N'Khách hàng thông báo hủy chuyến đi trước hạn';
 
     -- 1. Kiểm tra trạng thái hợp lệ của đơn đặt phòng
@@ -911,9 +948,23 @@ GO
 -- Xử lý nghiệp vụ chuyển phòng lưu trú giữa chừng cho khách hàng
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongDoi VARCHAR(10) = 'DP0001';
-    DECLARE @MaPhongHienTai VARCHAR(10) = 'P001';
-    DECLARE @MaPhongChuyenDen VARCHAR(10) = 'P002';
+    -- Tự động lấy đơn đang lưu trú và phòng hiện tại của đơn đó
+    DECLARE @MaDatPhongDoi VARCHAR(10);
+    DECLARE @MaPhongHienTai VARCHAR(10);
+    SELECT TOP 1 
+        @MaDatPhongDoi = dp.MaDatPhong,
+        @MaPhongHienTai = ctdp.MaPhong
+    FROM DatPhong dp
+    INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
+    WHERE dp.TrangThai = N'Đã nhận phòng'
+    ORDER BY dp.NgayNhanDuKien ASC;
+
+    -- Tự động lấy một phòng trống khả dụng khác để chuyển đến
+    DECLARE @MaPhongChuyenDen VARCHAR(10);
+    SELECT TOP 1 @MaPhongChuyenDen = MaPhong 
+    FROM Phong 
+    WHERE TrangThai = N'Trống' AND MaPhong <> @MaPhongHienTai
+    ORDER BY MaPhong ASC;
 
     -- 1. Kiểm tra phòng mới có đang thực sự ở trạng thái 'Trống' hay không
     IF NOT EXISTS (SELECT 1 FROM Phong WHERE MaPhong = @MaPhongChuyenDen AND TrangThai = N'Trống')
@@ -976,8 +1027,15 @@ GO
 -- Xử lý gia hạn thời gian lưu trú có kiểm tra xung đột lịch đặt tương lai
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaDatPhongGiaHan VARCHAR(10) = 'DP0001';
-    DECLARE @NgayTraMoi DATE = '2026-07-06';
+    -- Tự động lấy đơn đặt phòng đang lưu trú và tính ngày trả mới gia hạn thêm 2 ngày
+    DECLARE @MaDatPhongGiaHan VARCHAR(10);
+    DECLARE @NgayTraMoi DATE;
+    SELECT TOP 1 
+        @MaDatPhongGiaHan = MaDatPhong,
+        @NgayTraMoi = DATEADD(DAY, 2, NgayTraDuKien)
+    FROM DatPhong 
+    WHERE TrangThai = N'Đã nhận phòng'
+    ORDER BY NgayNhanDuKien ASC;
 
     DECLARE @NgayTraCu DATE;
     SELECT @NgayTraCu = NgayTraDuKien 
@@ -1038,9 +1096,9 @@ GO
 -- CASE 20: Kiểm soát tranh chấp đặt phòng đồng thời bằng khóa mức dòng (Concurrency Control & Overbooking Prevention)
 -- TRƯỜNG HỢP SỬ DỤNG: Nhiều luồng giao dịch đồng thời (ví dụ: Hai khách hàng trên website hoặc nhân viên lễ tân tại quầy) cùng chọn đặt một phòng vật lý cho cùng một khoảng ngày.
 -- MỤC ĐÍCH: Áp dụng cơ chế khóa mức dòng bi quan (Pessimistic Row-level Locking):
-  - T-SQL: `WITH (UPDLOCK, HOLDLOCK)`
-  - MySQL: `SELECT ... FOR UPDATE`
-Bảo đảm tuần tự hóa việc kiểm tra và đặt phòng, ngăn chặn hiện tượng Overbooking (bán trùng phòng).
+--   - T-SQL: `WITH (UPDLOCK, HOLDLOCK)`
+--   - MySQL: `SELECT ... FOR UPDATE`
+--   Bảo đảm tuần tự hóa việc kiểm tra và đặt phòng, ngăn chặn hiện tượng Overbooking (bán trùng phòng).
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Hiện tượng tương tranh (Race Condition) và bóng ma (Phantom Read) khi đọc dữ liệu có thể dẫn đến việc hai giao dịch cùng nhận thấy phòng trống và cùng ghi nhận thành công nếu không áp dụng cơ chế khóa chặt chẽ.
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ DECLARE đến GO) rồi nhấn F5.
@@ -1048,7 +1106,12 @@ Bảo đảm tuần tự hóa việc kiểm tra và đặt phòng, ngăn chặn 
 -- Kiểm soát tranh chấp đặt phòng đồng thời bằng cơ chế khóa bi quan
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaPhongChon VARCHAR(10) = 'P005';
+    -- Tự động chọn một phòng đang hoạt động bình thường
+    DECLARE @MaPhongChon VARCHAR(10);
+    SELECT TOP 1 @MaPhongChon = MaPhong 
+    FROM Phong 
+    WHERE TrangThai <> N'Đang bảo trì'
+    ORDER BY MaPhong ASC;
     DECLARE @NgayNhanBooking DATE = '2026-11-10';
     DECLARE @NgayTraBooking DATE = '2026-11-15';
 
@@ -1095,9 +1158,9 @@ GO
 -- CASE 21: Phát hiện sai lệch số liệu và cảnh báo bất thường trên hóa đơn (Billing Discrepancy & Anomaly Detection)
 -- TRƯỜNG HỢP SỬ DỤNG: Phục vụ công tác kiểm soát nội bộ và thanh tra tài chính: Rà soát toàn bộ các hóa đơn đã lập để phát hiện các dấu hiệu sai lệch số tiền hoặc gian lận thu chi.
 -- MỤC ĐÍCH: So sánh độc lập số tiền lưu vết trên thực thể HoaDon với số tiền tính toán lại từ các thực thể gốc:
-  1. Tiền phòng trên hóa đơn so với `SUM(ctdp.DonGia) * Số đêm`.
-  2. Tiền dịch vụ trên hóa đơn so với `SUM(ccdv.SoLuong * dv.DonGia)`.
-  3. Phát hiện các hóa đơn có tổng tiền âm hoặc tiền giảm giá vượt quá tổng doanh thu.
+--   1. Tiền phòng trên hóa đơn so với `SUM(ctdp.DonGia) * Số đêm`.
+--   2. Tiền dịch vụ trên hóa đơn so với `SUM(ccdv.SoLuong * dv.DonGia)`.
+--   3. Phát hiện các hóa đơn có tổng tiền âm hoặc tiền giảm giá vượt quá tổng doanh thu.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Ngăn chặn và cảnh báo các hành vi gian lận thông đồng (ví dụ: Tự ý sửa cột giảm giá trên hóa đơn để chiếm đoạt tiền mặt của khách sạn).
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ DECLARE đến GO) rồi nhấn F5.
@@ -1115,7 +1178,7 @@ WITH TinhToanChuanCTE AS (
         (hd.TienPhong + hd.TienDichVu + hd.TienPhuThu - hd.GiamGia) AS TongTienThucThu,
         -- Tính toán lại tiền phòng chuẩn từ ChiTietDatPhong
         (
-            SELECT SUM(ctdp.DonGia) * DATEDIFF(DAY, dp.NgayNhanDuKien, dp.NgayTraDuKien)
+            SELECT SUM(ctdp.DonGia * DATEDIFF(DAY, dp.NgayNhanDuKien, dp.NgayTraDuKien))
             FROM DatPhong dp
             INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
             WHERE dp.MaDatPhong = hd.MaDatPhong
@@ -1170,7 +1233,7 @@ GO
 -- CASE 22: Xử lý cập nhật thông tin nhân viên nghỉ việc và chuyển giao quyền quản lý (Employee Termination & Soft-Delete Reassignment)
 -- TRƯỜNG HỢP SỬ DỤNG: Một nhân viên giữ chức vụ Quản lý (ví dụ: NV004) hoàn tất thủ tục thôi việc tại khách sạn.
 -- MỤC ĐÍCH: 1. Thực hiện xóa mềm (Soft-Delete) bằng cách cập nhật `TrangThai = N'Nghỉ việc'`, ngăn chặn tài khoản này tiếp tục tham gia xử lý đặt phòng hoặc hóa đơn mới.
-2. Tái cấu trúc chuỗi quản lý: Chuyển giao toàn bộ nhân viên cấp dưới trực thuộc của người nghỉ việc sang cho Quản lý kế nhiệm (ví dụ: NV001), bảo tồn tính toàn vẹn của cây tổ chức nhân sự.
+--   2. Tái cấu trúc chuỗi quản lý: Chuyển giao toàn bộ nhân viên cấp dưới trực thuộc của người nghỉ việc sang cho Quản lý kế nhiệm (ví dụ: NV001), bảo tồn tính toàn vẹn của cây tổ chức nhân sự.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Tuyệt đối không sử dụng lệnh DELETE để xóa bản ghi nhân viên vì sẽ vi phạm ràng buộc toàn vẹn khóa ngoại (FOREIGN KEY) với các bảng giao dịch lịch sử trong quá khứ (DatPhong, HoaDon, CungCapDichVu).
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ DECLARE đến GO) rồi nhấn F5.
@@ -1178,8 +1241,20 @@ GO
 -- Xử lý an toàn khi Quản lý nghỉ việc và chuyển giao nhân sự trực thuộc
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaNVNghiViec VARCHAR(10) = 'NV004';
-    DECLARE @MaQuanLyKeNhiem VARCHAR(10) = 'NV001';
+    -- Tự động lấy một quản lý đang có cấp dưới trực thuộc
+    DECLARE @MaNVNghiViec VARCHAR(10);
+    SELECT TOP 1 @MaNVNghiViec = ql.MaNV
+    FROM QuanLy ql
+    INNER JOIN NhanVien nv ON ql.MaNV = nv.MaQuanLy
+    WHERE nv.TrangThai = N'Đang làm'
+    ORDER BY ql.MaNV DESC;
+
+    -- Tự động lấy một quản lý khác đang làm việc để kế nhiệm
+    DECLARE @MaQuanLyKeNhiem VARCHAR(10);
+    SELECT TOP 1 @MaQuanLyKeNhiem = MaNV 
+    FROM QuanLy 
+    WHERE MaNV <> @MaNVNghiViec
+    ORDER BY MaNV ASC;
 
     -- 1. Kiểm tra tính hợp lệ của Quản lý kế nhiệm
     IF NOT EXISTS (
@@ -1224,7 +1299,7 @@ GO
 -- CASE 23: Khóa bảo trì phòng đột xuất và điều phối các đơn đặt phòng bị ảnh hưởng (Emergency Room Maintenance & Rescheduling)
 -- TRƯỜNG HỢP SỬ DỤNG: Phòng vật lý (ví dụ: P010) phát sinh sự cố kỹ thuật đột xuất (rò rỉ ống nước, chập điện) đòi hỏi phải tạm ngừng phục vụ để sửa chữa.
 -- MỤC ĐÍCH: 1. Chuyển trạng thái phòng sang 'Đang bảo trì' để ngăn chặn các lượt đặt phòng mới.
-2. Rà soát và lập danh sách tất cả các đơn đặt phòng trong tương lai đã gán phòng P010 để bộ phận tiếp tân chủ động liên hệ điều chuyển khách hàng sang các phòng tương đương.
+--   2. Rà soát và lập danh sách tất cả các đơn đặt phòng trong tương lai đã gán phòng P010 để bộ phận tiếp tân chủ động liên hệ điều chuyển khách hàng sang các phòng tương đương.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Nếu phòng hiện tại đang có khách ở ('Đang sử dụng') thì hệ thống cảnh báo yêu cầu thực hiện thủ tục đổi phòng cho khách trước khi khóa bảo trì.
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ DECLARE đến GO) rồi nhấn F5.
@@ -1232,7 +1307,12 @@ GO
 -- Khóa bảo trì phòng khẩn cấp và tìm kiếm các đơn đặt phòng tương lai bị ảnh hưởng
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaPhongBaoTri VARCHAR(10) = 'P010';
+    -- Tự động lấy một phòng đang trống để khóa bảo trì đột xuất
+    DECLARE @MaPhongBaoTri VARCHAR(10);
+    SELECT TOP 1 @MaPhongBaoTri = MaPhong 
+    FROM Phong 
+    WHERE TrangThai = N'Trống'
+    ORDER BY MaPhong ASC;
     DECLARE @LyDoBaoTri NVARCHAR(200) = N'Khóa bảo trì đột xuất do sự cố kỹ thuật';
 
     -- 1. Kiểm tra trạng thái hiện tại: Ngăn chặn khóa phòng nếu đang có khách lưu trú

@@ -168,7 +168,12 @@ ORDER BY lp.GiaPhong ASC, p.SoPhong ASC;
 -- Thủ tục nhận phòng (Check-in) trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongCheckIn = 'DP0039';
+-- Tự động lấy đơn đặt phòng hợp lệ đang ở trạng thái 'Đã đặt'
+SELECT MaDatPhong INTO @MaDatPhongCheckIn 
+FROM DatPhong 
+WHERE TrangThai = 'Đã đặt' 
+ORDER BY NgayNhanDuKien ASC 
+LIMIT 1;
 
 -- 1. Kiểm tra trạng thái hiện tại của đơn đặt phòng
 SELECT TrangThai INTO @CurrentStatus
@@ -222,9 +227,10 @@ COMMIT;
 -- Ghi nhận sử dụng dịch vụ trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongSD = 'DP0001';
-SET @MaDVOrder = 'DV06';
-SET @MaNVDichVuOrder = 'NV045';
+-- Tự động lấy đơn đặt phòng đang lưu trú, dịch vụ đang mở và nhân viên dịch vụ đang làm việc
+SELECT MaDatPhong INTO @MaDatPhongSD FROM DatPhong WHERE TrangThai = 'Đã nhận phòng' ORDER BY NgayNhanDuKien ASC LIMIT 1;
+SELECT MaDV INTO @MaDVOrder FROM DichVu WHERE TrangThai = 'Đang cung cấp' ORDER BY MaDV ASC LIMIT 1;
+SELECT nv.MaNV INTO @MaNVDichVuOrder FROM NhanVien nv INNER JOIN NhanVienDichVu nvdv ON nv.MaNV = nvdv.MaNV WHERE nv.TrangThai = 'Đang làm' ORDER BY nv.MaNV ASC LIMIT 1;
 SET @SoLuongOrder = 2;
 SET @GhiChuOrder = 'Khách gọi dịch vụ phục vụ tận phòng';
 
@@ -347,7 +353,12 @@ ORDER BY TongGiaTriChiTieu DESC;
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ SET đến hết lệnh/COMMIT) rồi nhấn Ctrl+Shift+Enter.
 -- ==========================================================================================
 -- Bảng kê tạm tính chi phí trong MySQL
-SET @MaDatPhongFolio = 'DP0001';
+-- Tự động lấy đơn đặt phòng đang có khách lưu trú để xuất bảng kê chi phí trước thanh toán
+SELECT MaDatPhong INTO @MaDatPhongFolio 
+FROM DatPhong 
+WHERE TrangThai = 'Đã nhận phòng' 
+ORDER BY NgayNhanDuKien ASC 
+LIMIT 1;
 
 WITH TienPhongCTE AS (
     SELECT 
@@ -399,9 +410,9 @@ WHERE dp.MaDatPhong = @MaDatPhongFolio;
 -- CASE 10: Xử lý thủ tục trả phòng và xuất hóa đơn thanh toán khép kín (Check-out & Billing Transaction)
 -- TRƯỜNG HỢP SỬ DỤNG: Khách hàng hoàn tất kỳ lưu trú và thực hiện thanh toán chi phí tại quầy thu ngân để kết thúc đơn đặt phòng.
 -- MỤC ĐÍCH: Thực hiện chuỗi thao tác nguyên tử (Atomicity):
-  1. Tự động tính toán tổng tiền phòng và tiền dịch vụ thực tế để ghi nhận vào thực thể HoaDon.
-  2. Cập nhật trạng thái DatPhong sang 'Đã hoàn thành'.
-  3. Giải phóng tất cả các phòng vật lý trong ChiTietDatPhong về trạng thái 'Trống' để tiếp tục đón lượt khách kế tiếp.
+--   1. Tự động tính toán tổng tiền phòng và tiền dịch vụ thực tế để ghi nhận vào thực thể HoaDon.
+--   2. Cập nhật trạng thái DatPhong sang 'Đã hoàn thành'.
+--   3. Giải phóng tất cả các phòng vật lý trong ChiTietDatPhong về trạng thái 'Trống' để tiếp tục đón lượt khách kế tiếp.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   1. Vi phạm ràng buộc duy nhất (UQ_HoaDon_DatPhong): Mỗi đơn đặt phòng chỉ có duy nhất một hóa đơn thanh toán. Ngăn chặn việc xuất hóa đơn trùng lặp.
 --   2. Kiểm soát ràng buộc CK_HoaDon_TongTien: Tổng tiền thanh toán (TienPhong + TienDichVu + TienPhuThu - GiamGia) không được nhỏ hơn 0.
@@ -410,8 +421,20 @@ WHERE dp.MaDatPhong = @MaDatPhongFolio;
 -- Thủ tục thanh toán và trả phòng trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongCheckout = 'DP0001';
-SET @MaNVLapCheckout = 'NV021';
+-- Tự động lấy đơn đặt phòng đang lưu trú chưa lập hóa đơn và nhân viên lễ tân đang làm việc
+SELECT dp.MaDatPhong INTO @MaDatPhongCheckout 
+FROM DatPhong dp
+WHERE dp.TrangThai = 'Đã nhận phòng'
+  AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong)
+ORDER BY dp.NgayNhanDuKien ASC 
+LIMIT 1;
+
+SELECT nv.MaNV INTO @MaNVLapCheckout 
+FROM NhanVien nv
+INNER JOIN LeTan lt ON nv.MaNV = lt.MaNV
+WHERE nv.TrangThai = 'Đang làm'
+ORDER BY nv.MaNV ASC 
+LIMIT 1;
 SET @TienPhuThuInput = 100000;
 SET @GiamGiaInput = 50000;
 SET @PhuongThucInput = 'Chuyển khoản';
@@ -422,7 +445,7 @@ INTO @MaHDNew
 FROM HoaDon;
 
 -- 1. Tính toán tiền phòng
-SELECT SUM(ctdp.DonGia) * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien)
+SELECT SUM(ctdp.DonGia * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien))
 INTO @CalcTienPhong
 FROM DatPhong dp
 INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
@@ -586,8 +609,8 @@ ORDER BY TongDoanhThuDichVu DESC;
 -- CASE 14: Thống kê tỷ lệ lấp đầy phòng và doanh thu trên mỗi phòng sẵn có (Occupancy Rate & RevPAR Analysis)
 -- TRƯỜNG HỢP SỬ DỤNG: Đánh giá hiệu suất khai thác tài sản buồng phòng - chỉ số cốt lõi trong ngành quản trị khách sạn (Hospitality Management KPI).
 -- MỤC ĐÍCH: Tính toán hai chỉ số vận hành tiêu chuẩn quốc tế theo từng Loại phòng:
-  1. Tỷ lệ lấp đầy phòng (Occupancy Rate) = `(Số phòng có khách / Tổng số phòng) * 100%`.
-  2. Doanh thu trên mỗi phòng sẵn có (RevPAR) = `Tỷ lệ lấp đầy * Đơn giá niêm yết`.
+--   1. Tỷ lệ lấp đầy phòng (Occupancy Rate) = `(Số phòng có khách / Tổng số phòng) * 100%`.
+--   2. Doanh thu trên mỗi phòng sẵn có (RevPAR) = `Tỷ lệ lấp đầy * Đơn giá niêm yết`.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Tránh lỗi chia cho 0 (Division by zero) đối với các loại phòng chưa có phòng vật lý nào được kích hoạt thông qua hàm NULLIF.
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ SET đến hết lệnh/COMMIT) rồi nhấn Ctrl+Shift+Enter.
@@ -723,7 +746,12 @@ ORDER BY CapBacQuanLy ASC, MaQuanLy ASC, MaNV ASC;
 -- Hủy đặt phòng và hoàn trả trạng thái phòng trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongCancel = 'DP0039';
+-- Tự động lấy đơn đặt phòng đang ở trạng thái 'Đã đặt' để hủy
+SELECT MaDatPhong INTO @MaDatPhongCancel 
+FROM DatPhong 
+WHERE TrangThai = 'Đã đặt' 
+ORDER BY NgayDat DESC 
+LIMIT 1;
 SET @LyDoHuy = 'Khách hàng thông báo hủy chuyến đi trước hạn';
 
 -- 1. Cập nhật trạng thái đơn đặt phòng
@@ -761,9 +789,21 @@ COMMIT;
 -- Xử lý chuyển đổi phòng trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongDoi = 'DP0001';
-SET @MaPhongHienTai = 'P001';
-SET @MaPhongChuyenDen = 'P002';
+-- Tự động lấy đơn đang lưu trú và phòng hiện tại của đơn đó
+SELECT dp.MaDatPhong, ctdp.MaPhong 
+INTO @MaDatPhongDoi, @MaPhongHienTai
+FROM DatPhong dp
+INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
+WHERE dp.TrangThai = 'Đã nhận phòng'
+ORDER BY dp.NgayNhanDuKien ASC 
+LIMIT 1;
+
+-- Tự động lấy phòng trống sẵn sàng để chuyển đến
+SELECT MaPhong INTO @MaPhongChuyenDen 
+FROM Phong 
+WHERE TrangThai = 'Trống' AND MaPhong <> @MaPhongHienTai
+ORDER BY MaPhong ASC 
+LIMIT 1;
 
 -- Lấy đơn giá phòng mới
 SELECT lp.GiaPhong INTO @DonGiaMoi
@@ -807,8 +847,13 @@ COMMIT;
 -- Gia hạn lưu trú trong MySQL
 START TRANSACTION;
 
-SET @MaDatPhongGiaHan = 'DP0001';
-SET @NgayTraMoi = '2026-07-06';
+-- Tự động lấy đơn đặt phòng đang lưu trú và tính ngày trả mới gia hạn thêm 2 ngày
+SELECT MaDatPhong, DATE_ADD(NgayTraDuKien, INTERVAL 2 DAY)
+INTO @MaDatPhongGiaHan, @NgayTraMoi
+FROM DatPhong 
+WHERE TrangThai = 'Đã nhận phòng'
+ORDER BY NgayNhanDuKien ASC 
+LIMIT 1;
 
 SELECT NgayTraDuKien INTO @NgayTraCu
 FROM DatPhong 
@@ -847,9 +892,9 @@ COMMIT;
 -- CASE 20: Kiểm soát tranh chấp đặt phòng đồng thời bằng khóa mức dòng (Concurrency Control & Overbooking Prevention)
 -- TRƯỜNG HỢP SỬ DỤNG: Nhiều luồng giao dịch đồng thời (ví dụ: Hai khách hàng trên website hoặc nhân viên lễ tân tại quầy) cùng chọn đặt một phòng vật lý cho cùng một khoảng ngày.
 -- MỤC ĐÍCH: Áp dụng cơ chế khóa mức dòng bi quan (Pessimistic Row-level Locking):
-  - T-SQL: `WITH (UPDLOCK, HOLDLOCK)`
-  - MySQL: `SELECT ... FOR UPDATE`
-Bảo đảm tuần tự hóa việc kiểm tra và đặt phòng, ngăn chặn hiện tượng Overbooking (bán trùng phòng).
+--   - T-SQL: `WITH (UPDLOCK, HOLDLOCK)`
+--   - MySQL: `SELECT ... FOR UPDATE`
+--   Bảo đảm tuần tự hóa việc kiểm tra và đặt phòng, ngăn chặn hiện tượng Overbooking (bán trùng phòng).
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Hiện tượng tương tranh (Race Condition) và bóng ma (Phantom Read) khi đọc dữ liệu có thể dẫn đến việc hai giao dịch cùng nhận thấy phòng trống và cùng ghi nhận thành công nếu không áp dụng cơ chế khóa chặt chẽ.
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ SET đến hết lệnh/COMMIT) rồi nhấn Ctrl+Shift+Enter.
@@ -857,7 +902,12 @@ Bảo đảm tuần tự hóa việc kiểm tra và đặt phòng, ngăn chặn 
 -- Ngăn chặn tranh chấp đặt phòng đồng thời trong MySQL bằng SELECT ... FOR UPDATE
 START TRANSACTION;
 
-SET @MaPhongChon = 'P005';
+-- Tự động chọn một phòng đang hoạt động bình thường
+SELECT MaPhong INTO @MaPhongChon 
+FROM Phong 
+WHERE TrangThai <> 'Đang bảo trì' 
+ORDER BY MaPhong ASC 
+LIMIT 1;
 SET @NgayNhanBooking = '2026-11-10';
 SET @NgayTraBooking = '2026-11-15';
 
@@ -893,9 +943,9 @@ COMMIT;
 -- CASE 21: Phát hiện sai lệch số liệu và cảnh báo bất thường trên hóa đơn (Billing Discrepancy & Anomaly Detection)
 -- TRƯỜNG HỢP SỬ DỤNG: Phục vụ công tác kiểm soát nội bộ và thanh tra tài chính: Rà soát toàn bộ các hóa đơn đã lập để phát hiện các dấu hiệu sai lệch số tiền hoặc gian lận thu chi.
 -- MỤC ĐÍCH: So sánh độc lập số tiền lưu vết trên thực thể HoaDon với số tiền tính toán lại từ các thực thể gốc:
-  1. Tiền phòng trên hóa đơn so với `SUM(ctdp.DonGia) * Số đêm`.
-  2. Tiền dịch vụ trên hóa đơn so với `SUM(ccdv.SoLuong * dv.DonGia)`.
-  3. Phát hiện các hóa đơn có tổng tiền âm hoặc tiền giảm giá vượt quá tổng doanh thu.
+--   1. Tiền phòng trên hóa đơn so với `SUM(ctdp.DonGia) * Số đêm`.
+--   2. Tiền dịch vụ trên hóa đơn so với `SUM(ccdv.SoLuong * dv.DonGia)`.
+--   3. Phát hiện các hóa đơn có tổng tiền âm hoặc tiền giảm giá vượt quá tổng doanh thu.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Ngăn chặn và cảnh báo các hành vi gian lận thông đồng (ví dụ: Tự ý sửa cột giảm giá trên hóa đơn để chiếm đoạt tiền mặt của khách sạn).
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ SET đến hết lệnh/COMMIT) rồi nhấn Ctrl+Shift+Enter.
@@ -912,7 +962,7 @@ WITH TinhToanChuanCTE AS (
         hd.GiamGia,
         (hd.TienPhong + hd.TienDichVu + hd.TienPhuThu - hd.GiamGia) AS TongTienThucThu,
         (
-            SELECT SUM(ctdp.DonGia) * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien)
+            SELECT SUM(ctdp.DonGia * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien))
             FROM DatPhong dp
             INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
             WHERE dp.MaDatPhong = hd.MaDatPhong
@@ -965,7 +1015,7 @@ WHERE (TienPhongHoaDon <> TienPhongChuan)
 -- CASE 22: Xử lý cập nhật thông tin nhân viên nghỉ việc và chuyển giao quyền quản lý (Employee Termination & Soft-Delete Reassignment)
 -- TRƯỜNG HỢP SỬ DỤNG: Một nhân viên giữ chức vụ Quản lý (ví dụ: NV004) hoàn tất thủ tục thôi việc tại khách sạn.
 -- MỤC ĐÍCH: 1. Thực hiện xóa mềm (Soft-Delete) bằng cách cập nhật `TrangThai = N'Nghỉ việc'`, ngăn chặn tài khoản này tiếp tục tham gia xử lý đặt phòng hoặc hóa đơn mới.
-2. Tái cấu trúc chuỗi quản lý: Chuyển giao toàn bộ nhân viên cấp dưới trực thuộc của người nghỉ việc sang cho Quản lý kế nhiệm (ví dụ: NV001), bảo tồn tính toàn vẹn của cây tổ chức nhân sự.
+--   2. Tái cấu trúc chuỗi quản lý: Chuyển giao toàn bộ nhân viên cấp dưới trực thuộc của người nghỉ việc sang cho Quản lý kế nhiệm (ví dụ: NV001), bảo tồn tính toàn vẹn của cây tổ chức nhân sự.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Tuyệt đối không sử dụng lệnh DELETE để xóa bản ghi nhân viên vì sẽ vi phạm ràng buộc toàn vẹn khóa ngoại (FOREIGN KEY) với các bảng giao dịch lịch sử trong quá khứ (DatPhong, HoaDon, CungCapDichVu).
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ SET đến hết lệnh/COMMIT) rồi nhấn Ctrl+Shift+Enter.
@@ -973,8 +1023,20 @@ WHERE (TienPhongHoaDon <> TienPhongChuan)
 -- Xử lý nhân sự nghỉ việc trong MySQL
 START TRANSACTION;
 
-SET @MaNVNghiViec = 'NV004';
-SET @MaQuanLyKeNhiem = 'NV001';
+-- Tự động lấy một quản lý đang có cấp dưới trực thuộc
+SELECT ql.MaNV INTO @MaNVNghiViec
+FROM QuanLy ql
+INNER JOIN NhanVien nv ON ql.MaNV = nv.MaQuanLy
+WHERE nv.TrangThai = 'Đang làm'
+ORDER BY ql.MaNV DESC 
+LIMIT 1;
+
+-- Tự động lấy một quản lý khác đang làm việc để kế nhiệm
+SELECT MaNV INTO @MaQuanLyKeNhiem 
+FROM QuanLy 
+WHERE MaNV <> @MaNVNghiViec
+ORDER BY MaNV ASC 
+LIMIT 1;
 
 -- 1. Cập nhật trạng thái nghỉ việc (Xóa mềm)
 UPDATE NhanVien 
@@ -1000,7 +1062,7 @@ COMMIT;
 -- CASE 23: Khóa bảo trì phòng đột xuất và điều phối các đơn đặt phòng bị ảnh hưởng (Emergency Room Maintenance & Rescheduling)
 -- TRƯỜNG HỢP SỬ DỤNG: Phòng vật lý (ví dụ: P010) phát sinh sự cố kỹ thuật đột xuất (rò rỉ ống nước, chập điện) đòi hỏi phải tạm ngừng phục vụ để sửa chữa.
 -- MỤC ĐÍCH: 1. Chuyển trạng thái phòng sang 'Đang bảo trì' để ngăn chặn các lượt đặt phòng mới.
-2. Rà soát và lập danh sách tất cả các đơn đặt phòng trong tương lai đã gán phòng P010 để bộ phận tiếp tân chủ động liên hệ điều chuyển khách hàng sang các phòng tương đương.
+--   2. Rà soát và lập danh sách tất cả các đơn đặt phòng trong tương lai đã gán phòng P010 để bộ phận tiếp tân chủ động liên hệ điều chuyển khách hàng sang các phòng tương đương.
 -- TÌNH HUỐNG NGOẠI LỆ (EDGE CASE):
 --   Nếu phòng hiện tại đang có khách ở ('Đang sử dụng') thì hệ thống cảnh báo yêu cầu thực hiện thủ tục đổi phòng cho khách trước khi khóa bảo trì.
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ SET đến hết lệnh/COMMIT) rồi nhấn Ctrl+Shift+Enter.
@@ -1008,7 +1070,12 @@ COMMIT;
 -- Khóa bảo trì phòng và tìm các đơn đặt phòng bị ảnh hưởng trong MySQL
 START TRANSACTION;
 
-SET @MaPhongBaoTri = 'P010';
+-- Tự động lấy một phòng đang trống để khóa bảo trì đột xuất
+SELECT MaPhong INTO @MaPhongBaoTri 
+FROM Phong 
+WHERE TrangThai = 'Trống' 
+ORDER BY MaPhong ASC 
+LIMIT 1;
 SET @LyDoBaoTri = 'Khóa bảo trì đột xuất do sự cố kỹ thuật';
 
 -- 1. Cập nhật trạng thái phòng sang 'Đang bảo trì' nếu không có khách đang ở
