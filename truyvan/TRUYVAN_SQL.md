@@ -467,12 +467,16 @@ Microsoft SQL Server:
 -- Ghi nhận sử dụng dịch vụ cho đơn đặt phòng đang lưu trú
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaCCNew VARCHAR(10) = 'CC067';
     DECLARE @MaDatPhongSD VARCHAR(10) = 'DP0001';
     DECLARE @MaDVOrder VARCHAR(10) = 'DV06';
     DECLARE @MaNVDichVuOrder VARCHAR(10) = 'NV045';
     DECLARE @SoLuongOrder INT = 2;
     DECLARE @GhiChuOrder NVARCHAR(200) = N'Khách gọi dịch vụ phục vụ tận phòng';
+
+    -- Tự động sinh mã cung cấp dịch vụ tiếp theo (VD: CC068 -> CC069)
+    DECLARE @MaCCNew VARCHAR(10);
+    SELECT @MaCCNew = 'CC' + RIGHT('000' + CAST(ISNULL(MAX(CAST(SUBSTRING(MaCC, 3, 10) AS INT)), 0) + 1 AS VARCHAR(10)), 3)
+    FROM CungCapDichVu;
 
     -- 1. Kiểm tra đơn đặt phòng phải đang ở trạng thái 'Đã nhận phòng'
     IF NOT EXISTS (
@@ -535,12 +539,16 @@ MySQL:
 -- Ghi nhận sử dụng dịch vụ trong MySQL
 START TRANSACTION;
 
-SET @MaCCNew = 'CC067';
 SET @MaDatPhongSD = 'DP0001';
 SET @MaDVOrder = 'DV06';
 SET @MaNVDichVuOrder = 'NV045';
 SET @SoLuongOrder = 2;
 SET @GhiChuOrder = 'Khách gọi dịch vụ phục vụ tận phòng';
+
+-- Tự động sinh mã cung cấp dịch vụ tiếp theo (VD: CC068 -> CC069)
+SELECT CONCAT('CC', LPAD(COALESCE(MAX(CAST(SUBSTRING(MaCC, 3) AS UNSIGNED)), 0) + 1, 3, '0'))
+INTO @MaCCNew
+FROM CungCapDichVu;
 
 -- Thực hiện chèn dữ liệu có kiểm tra tính toàn vẹn
 INSERT INTO CungCapDichVu (MaCC, MaDatPhong, MaNVDichVu, MaDV, SoLuong, GhiChu)

@@ -276,12 +276,16 @@ GO
 -- Ghi nhận sử dụng dịch vụ cho đơn đặt phòng đang lưu trú
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaCCNew VARCHAR(10) = 'CC067';
     DECLARE @MaDatPhongSD VARCHAR(10) = 'DP0001';
     DECLARE @MaDVOrder VARCHAR(10) = 'DV06';
     DECLARE @MaNVDichVuOrder VARCHAR(10) = 'NV045';
     DECLARE @SoLuongOrder INT = 2;
     DECLARE @GhiChuOrder NVARCHAR(200) = N'Khách gọi dịch vụ phục vụ tận phòng';
+
+    -- Tự động sinh mã cung cấp dịch vụ tiếp theo (VD: CC068 -> CC069)
+    DECLARE @MaCCNew VARCHAR(10);
+    SELECT @MaCCNew = 'CC' + RIGHT('000' + CAST(ISNULL(MAX(CAST(SUBSTRING(MaCC, 3, 10) AS INT)), 0) + 1 AS VARCHAR(10)), 3)
+    FROM CungCapDichVu;
 
     -- 1. Kiểm tra đơn đặt phòng phải đang ở trạng thái 'Đã nhận phòng'
     IF NOT EXISTS (

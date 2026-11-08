@@ -222,12 +222,16 @@ COMMIT;
 -- Ghi nhận sử dụng dịch vụ trong MySQL
 START TRANSACTION;
 
-SET @MaCCNew = 'CC067';
 SET @MaDatPhongSD = 'DP0001';
 SET @MaDVOrder = 'DV06';
 SET @MaNVDichVuOrder = 'NV045';
 SET @SoLuongOrder = 2;
 SET @GhiChuOrder = 'Khách gọi dịch vụ phục vụ tận phòng';
+
+-- Tự động sinh mã cung cấp dịch vụ tiếp theo (VD: CC068 -> CC069)
+SELECT CONCAT('CC', LPAD(COALESCE(MAX(CAST(SUBSTRING(MaCC, 3) AS UNSIGNED)), 0) + 1, 3, '0'))
+INTO @MaCCNew
+FROM CungCapDichVu;
 
 -- Thực hiện chèn dữ liệu có kiểm tra tính toàn vẹn
 INSERT INTO CungCapDichVu (MaCC, MaDatPhong, MaNVDichVu, MaDV, SoLuong, GhiChu)
