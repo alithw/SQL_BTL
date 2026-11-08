@@ -410,12 +410,16 @@ WHERE dp.MaDatPhong = @MaDatPhongFolio;
 -- Thủ tục thanh toán và trả phòng trong MySQL
 START TRANSACTION;
 
-SET @MaHDNew = 'HD0025';
 SET @MaDatPhongCheckout = 'DP0001';
 SET @MaNVLapCheckout = 'NV021';
 SET @TienPhuThuInput = 100000;
 SET @GiamGiaInput = 50000;
 SET @PhuongThucInput = 'Chuyển khoản';
+
+-- Tự động sinh mã hóa đơn tiếp theo (VD: HD0025 -> HD0026)
+SELECT CONCAT('HD', LPAD(COALESCE(MAX(CAST(SUBSTRING(MaHD, 3) AS UNSIGNED)), 0) + 1, 4, '0'))
+INTO @MaHDNew
+FROM HoaDon;
 
 -- 1. Tính toán tiền phòng
 SELECT SUM(ctdp.DonGia) * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien)

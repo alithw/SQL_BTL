@@ -857,12 +857,16 @@ Microsoft SQL Server:
 -- Giao dịch trả phòng, quyết toán và xuất hóa đơn thanh toán
 BEGIN TRANSACTION;
 BEGIN TRY
-    DECLARE @MaHDNew VARCHAR(10) = 'HD0025';
     DECLARE @MaDatPhongCheckout VARCHAR(10) = 'DP0001';
     DECLARE @MaNVLapCheckout VARCHAR(10) = 'NV021';
     DECLARE @TienPhuThuInput DECIMAL(15,0) = 100000;
     DECLARE @GiamGiaInput DECIMAL(15,0) = 50000;
     DECLARE @PhuongThucInput NVARCHAR(20) = N'Chuyển khoản';
+
+    -- Tự động sinh mã hóa đơn tiếp theo (VD: HD0025 -> HD0026)
+    DECLARE @MaHDNew VARCHAR(10);
+    SELECT @MaHDNew = 'HD' + RIGHT('0000' + CAST(ISNULL(MAX(CAST(SUBSTRING(MaHD, 3, 10) AS INT)), 0) + 1 AS VARCHAR(10)), 4)
+    FROM HoaDon;
 
     -- 1. Kiểm tra đơn đặt phòng phải đang ở trạng thái 'Đã nhận phòng'
     IF NOT EXISTS (
@@ -946,12 +950,16 @@ MySQL:
 -- Thủ tục thanh toán và trả phòng trong MySQL
 START TRANSACTION;
 
-SET @MaHDNew = 'HD0025';
 SET @MaDatPhongCheckout = 'DP0001';
 SET @MaNVLapCheckout = 'NV021';
 SET @TienPhuThuInput = 100000;
 SET @GiamGiaInput = 50000;
 SET @PhuongThucInput = 'Chuyển khoản';
+
+-- Tự động sinh mã hóa đơn tiếp theo (VD: HD0025 -> HD0026)
+SELECT CONCAT('HD', LPAD(COALESCE(MAX(CAST(SUBSTRING(MaHD, 3) AS UNSIGNED)), 0) + 1, 4, '0'))
+INTO @MaHDNew
+FROM HoaDon;
 
 -- 1. Tính toán tiền phòng
 SELECT SUM(ctdp.DonGia) * DATEDIFF(dp.NgayTraDuKien, dp.NgayNhanDuKien)
