@@ -281,21 +281,23 @@ GO
 -- Ghi nhận sử dụng dịch vụ cho đơn đặt phòng đang lưu trú
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- Tự động lấy đơn đặt phòng đang lưu trú, dịch vụ đang mở và nhân viên dịch vụ đang làm việc
+    -- 1. THÔNG TIN KHÁCH HÀNG CHỌN (Giả định khách gọi dịch vụ):
+    DECLARE @MaDVOrder VARCHAR(10) = 'DV06';                            -- Khách chọn dịch vụ (Ví dụ: DV06 - Giặt hấp cao cấp)
+    DECLARE @SoLuongOrder INT = 2;                                      -- Khách chọn số lượng sử dụng
+    DECLARE @GhiChuOrder NVARCHAR(200) = N'Khách gọi dịch vụ phục vụ tận phòng'; -- Ghi chú yêu cầu của khách
+
+    -- 2. THÔNG TIN HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO):
+    -- Tự động gán cho đơn đặt phòng đang có khách lưu trú
     DECLARE @MaDatPhongSD VARCHAR(10);
     SELECT TOP 1 @MaDatPhongSD = MaDatPhong FROM DatPhong WHERE TrangThai = N'Đã nhận phòng' ORDER BY NgayNhanDuKien ASC;
 
-    DECLARE @MaDVOrder VARCHAR(10);
-    SELECT TOP 1 @MaDVOrder = MaDV FROM DichVu WHERE TrangThai = N'Đang cung cấp' ORDER BY MaDV ASC;
-
+    -- Tự động điều phối nhân viên bộ phận dịch vụ đang làm việc
     DECLARE @MaNVDichVuOrder VARCHAR(10);
     SELECT TOP 1 @MaNVDichVuOrder = nv.MaNV 
     FROM NhanVien nv 
     INNER JOIN NhanVienDichVu nvdv ON nv.MaNV = nvdv.MaNV 
     WHERE nv.TrangThai = N'Đang làm' 
     ORDER BY nv.MaNV ASC;
-    DECLARE @SoLuongOrder INT = 2;
-    DECLARE @GhiChuOrder NVARCHAR(200) = N'Khách gọi dịch vụ phục vụ tận phòng';
 
     -- Tự động sinh mã cung cấp dịch vụ tiếp theo (VD: CC068 -> CC069)
     DECLARE @MaCCNew VARCHAR(10);

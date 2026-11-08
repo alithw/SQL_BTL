@@ -227,9 +227,16 @@ COMMIT;
 -- Ghi nhận sử dụng dịch vụ trong MySQL
 START TRANSACTION;
 
--- Tự động lấy đơn đặt phòng đang lưu trú, dịch vụ đang mở và nhân viên dịch vụ đang làm việc
+-- 1. THÔNG TIN KHÁCH HÀNG CHỌN (Giả định khách gọi dịch vụ)
+SET @MaDVOrder = 'DV06';
+SET @SoLuongOrder = 2;
+SET @GhiChuOrder = 'Khách gọi dịch vụ phục vụ tận phòng';
+
+-- 2. THÔNG TIN HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO)
+-- Tự động gán cho đơn đặt phòng đang có khách lưu trú
 SELECT MaDatPhong INTO @MaDatPhongSD FROM DatPhong WHERE TrangThai = 'Đã nhận phòng' ORDER BY NgayNhanDuKien ASC LIMIT 1;
-SELECT MaDV INTO @MaDVOrder FROM DichVu WHERE TrangThai = 'Đang cung cấp' ORDER BY MaDV ASC LIMIT 1;
+
+-- Tự động điều phối nhân viên dịch vụ đang làm việc
 SELECT nv.MaNV INTO @MaNVDichVuOrder FROM NhanVien nv INNER JOIN NhanVienDichVu nvdv ON nv.MaNV = nvdv.MaNV WHERE nv.TrangThai = 'Đang làm' ORDER BY nv.MaNV ASC LIMIT 1;
 SET @SoLuongOrder = 2;
 SET @GhiChuOrder = 'Khách gọi dịch vụ phục vụ tận phòng';
