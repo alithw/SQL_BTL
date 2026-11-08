@@ -306,14 +306,15 @@ BEGIN TRY
     END;
 
     -- 3. THÔNG TIN HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO):
-
-    -- Tự động điều phối nhân viên bộ phận dịch vụ đang làm việc
+    -- Tự động điều phối nhân viên dịch vụ ít việc nhất (Cân bằng tải - Dàn đều cho toàn bộ nhân viên)
     DECLARE @MaNVDichVuOrder VARCHAR(10);
     SELECT TOP 1 @MaNVDichVuOrder = nv.MaNV 
     FROM NhanVien nv 
     INNER JOIN NhanVienDichVu nvdv ON nv.MaNV = nvdv.MaNV 
+    LEFT JOIN CungCapDichVu cc ON nv.MaNV = cc.MaNVDichVu
     WHERE nv.TrangThai = N'Đang làm' 
-    ORDER BY nv.MaNV ASC;
+    GROUP BY nv.MaNV
+    ORDER BY COUNT(cc.MaCC) ASC, nv.MaNV ASC;
 
     -- Tự động sinh mã cung cấp dịch vụ tiếp theo (VD: CC068 -> CC069)
     DECLARE @MaCCNew VARCHAR(10);
@@ -563,13 +564,15 @@ BEGIN TRY
     END;
 
     -- 3. HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO):
-    -- Tự động điều phối nhân viên lễ tân đang làm việc lập hóa đơn
+    -- Tự động điều phối nhân viên lễ tân đang làm việc ít việc nhất lập hóa đơn (Cân bằng tải)
     DECLARE @MaNVLapCheckout VARCHAR(10);
     SELECT TOP 1 @MaNVLapCheckout = nv.MaNV 
     FROM NhanVien nv
     INNER JOIN LeTan lt ON nv.MaNV = lt.MaNV
+    LEFT JOIN HoaDon hd ON nv.MaNV = hd.MaNVLap
     WHERE nv.TrangThai = N'Đang làm'
-    ORDER BY nv.MaNV ASC;
+    GROUP BY nv.MaNV
+    ORDER BY COUNT(hd.MaHD) ASC, nv.MaNV ASC;
 
     -- Tự động sinh mã hóa đơn tiếp theo (VD: HD0025 -> HD0026)
     DECLARE @MaHDNew VARCHAR(10);
