@@ -209,13 +209,11 @@ GO
 BEGIN TRANSACTION;
 BEGIN TRY
     -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Tiếp nhận mã đơn đặt phòng của khách tại quầy
+    -- Nhập mã đơn cụ thể (VD: 'DP0029'). Để NULL nếu muốn hệ thống tự động chọn đơn 'Đã đặt' gần nhất.
     DECLARE @MaDatPhongCheckIn VARCHAR(10) = 'DP0029';
 
-    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không hợp lệ/đã nhận phòng trước đó,
-    -- tự động fallback lấy đơn 'Đã đặt' hợp lệ gần nhất để kịch bản demo luôn thành công 100%
-    IF @MaDatPhongCheckIn IS NULL OR NOT EXISTS (
-        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongCheckIn AND TrangThai = N'Đã đặt'
-    )
+    -- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL ĐỂ HỖ TRỢ DEMO NHANH):
+    IF @MaDatPhongCheckIn IS NULL
     BEGIN
         SELECT TOP 1 @MaDatPhongCheckIn = MaDatPhong 
         FROM DatPhong 
@@ -292,17 +290,14 @@ GO
 -- Ghi nhận sử dụng dịch vụ cho đơn đặt phòng đang lưu trú
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- 1. THÔNG TIN KHÁCH HÀNG CHỌN (Giả định khách gọi dịch vụ):
-    DECLARE @MaDatPhongSD VARCHAR(10) = 'DP0028';                       -- Đơn đặt phòng của khách đang lưu trú
+    -- 1. THÔNG TIN KHÁCH HÀNG CHỌN (Khách có thể gọi cùng 1 dịch vụ nhiều lần trong kỳ nghỉ):
+    DECLARE @MaDatPhongSD VARCHAR(10) = 'DP0028';                       -- Đơn đặt phòng của khách đang lưu trú (để NULL để auto chọn)
     DECLARE @MaDVOrder VARCHAR(10) = 'DV06';                            -- Khách chọn dịch vụ (Ví dụ: DV06 - Giặt hấp cao cấp)
     DECLARE @SoLuongOrder INT = 2;                                      -- Khách chọn số lượng sử dụng
     DECLARE @GhiChuOrder NVARCHAR(200) = N'Khách gọi dịch vụ phục vụ tận phòng'; -- Ghi chú yêu cầu của khách
 
-    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã nhận phòng',
-    -- tự động fallback lấy đơn 'Đã nhận phòng' đang có khách lưu trú
-    IF @MaDatPhongSD IS NULL OR NOT EXISTS (
-        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongSD AND TrangThai = N'Đã nhận phòng'
-    )
+    -- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL):
+    IF @MaDatPhongSD IS NULL
     BEGIN
         SELECT TOP 1 @MaDatPhongSD = MaDatPhong 
         FROM DatPhong 
@@ -475,14 +470,11 @@ GO
 -- THAO TÁC CHẠY: Bôi đen trọn vẹn khối code dưới đây (từ DECLARE đến GO) rồi nhấn F5.
 -- ==========================================================================================
 -- Bảng kê tạm tính chi phí lưu trú và dịch vụ trước khi lập hóa đơn
--- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Tiếp nhận mã đơn đặt phòng của khách yêu cầu xuất bảng kê
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Tiếp nhận mã đơn đặt phòng của khách yêu cầu xuất bảng kê (để NULL để auto chọn)
 DECLARE @MaDatPhongFolio VARCHAR(10) = 'DP0028';
 
--- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã nhận phòng',
--- tự động fallback lấy đơn đang lưu trú kế tiếp để luôn có kết quả trực quan
-IF @MaDatPhongFolio IS NULL OR NOT EXISTS (
-    SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongFolio AND TrangThai = N'Đã nhận phòng'
-)
+-- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL):
+IF @MaDatPhongFolio IS NULL
 BEGIN
     SELECT TOP 1 @MaDatPhongFolio = MaDatPhong 
     FROM DatPhong 
@@ -554,20 +546,14 @@ GO
 -- Giao dịch trả phòng, quyết toán và xuất hóa đơn thanh toán
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Lễ tân tiếp nhận yêu cầu trả phòng của khách
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Lễ tân tiếp nhận yêu cầu trả phòng của khách (để NULL để auto chọn)
     DECLARE @MaDatPhongCheckout VARCHAR(10) = 'DP0028';
     DECLARE @PhuongThucInput NVARCHAR(20) = N'Chuyển khoản';
     DECLARE @TienPhuThuInput DECIMAL(15,0) = 100000;
     DECLARE @GiamGiaInput DECIMAL(15,0) = 50000;
 
-    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã nhận phòng'
-    -- hoặc đã xuất hóa đơn rồi, tự động fallback lấy đơn đang lưu trú chưa lập hóa đơn kế tiếp
-    IF @MaDatPhongCheckout IS NULL OR NOT EXISTS (
-        SELECT 1 FROM DatPhong dp 
-        WHERE dp.MaDatPhong = @MaDatPhongCheckout 
-          AND dp.TrangThai = N'Đã nhận phòng'
-          AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong)
-    )
+    -- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL):
+    IF @MaDatPhongCheckout IS NULL
     BEGIN
         SELECT TOP 1 @MaDatPhongCheckout = dp.MaDatPhong 
         FROM DatPhong dp
@@ -932,15 +918,12 @@ GO
 -- Xử lý nghiệp vụ Hủy đặt phòng đảm bảo an toàn trạng thái phòng
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng liên hệ yêu cầu hủy đơn đặt phòng
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng liên hệ yêu cầu hủy đơn đặt phòng (để NULL để auto chọn)
     DECLARE @MaDatPhongCancel VARCHAR(10) = 'DP0040';
     DECLARE @LyDoHuy NVARCHAR(200) = N'Khách hàng thông báo hủy chuyến đi trước hạn';
 
-    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã đặt'
-    -- (ví dụ: đã hủy trước đó), tự động fallback lấy đơn 'Đã đặt' gần nhất
-    IF @MaDatPhongCancel IS NULL OR NOT EXISTS (
-        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongCancel AND TrangThai = N'Đã đặt'
-    )
+    -- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL):
+    IF @MaDatPhongCancel IS NULL
     BEGIN
         SELECT TOP 1 @MaDatPhongCancel = MaDatPhong 
         FROM DatPhong 
@@ -1000,15 +983,12 @@ GO
 -- Xử lý nghiệp vụ chuyển phòng lưu trú giữa chừng cho khách hàng
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng đang lưu trú yêu cầu chuyển sang phòng mới
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng đang lưu trú yêu cầu chuyển sang phòng mới (để NULL để auto chọn)
     DECLARE @MaDatPhongDoi VARCHAR(10) = 'DP0028';
     DECLARE @MaPhongChuyenDen VARCHAR(10) = 'P001';
 
-    -- 2. CƠ CHẾ CHỐNG LỖI DEMO:
-    -- Nếu đơn không hợp lệ hoặc không ở trạng thái 'Đã nhận phòng', tự động fallback lấy đơn đang lưu trú
-    IF @MaDatPhongDoi IS NULL OR NOT EXISTS (
-        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongDoi AND TrangThai = N'Đã nhận phòng'
-    )
+    -- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL):
+    IF @MaDatPhongDoi IS NULL
     BEGIN
         SELECT TOP 1 @MaDatPhongDoi = MaDatPhong 
         FROM DatPhong 
@@ -1022,11 +1002,7 @@ BEGIN TRY
     FROM ChiTietDatPhong ctdp
     WHERE ctdp.MaDatPhong = @MaDatPhongDoi;
 
-    -- Nếu phòng chuyển đến không ở trạng thái 'Trống' hoặc trùng phòng hiện tại,
-    -- tự động fallback lấy một phòng 'Trống' khả dụng khác
-    IF @MaPhongChuyenDen IS NULL OR @MaPhongChuyenDen = @MaPhongHienTai OR NOT EXISTS (
-        SELECT 1 FROM Phong WHERE MaPhong = @MaPhongChuyenDen AND TrangThai = N'Trống'
-    )
+    IF @MaPhongChuyenDen IS NULL
     BEGIN
         SELECT TOP 1 @MaPhongChuyenDen = MaPhong 
         FROM Phong 
@@ -1095,15 +1071,12 @@ GO
 -- Xử lý gia hạn thời gian lưu trú có kiểm tra xung đột lịch đặt tương lai
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng yêu cầu gia hạn thêm số ngày lưu trú
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng yêu cầu gia hạn thêm số ngày lưu trú (để NULL để auto chọn)
     DECLARE @MaDatPhongGiaHan VARCHAR(10) = 'DP0028';
     DECLARE @SoNgayGiaHanThem INT = 2;
 
-    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã nhận phòng',
-    -- tự động fallback lấy đơn đang lưu trú gần nhất
-    IF @MaDatPhongGiaHan IS NULL OR NOT EXISTS (
-        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongGiaHan AND TrangThai = N'Đã nhận phòng'
-    )
+    -- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL):
+    IF @MaDatPhongGiaHan IS NULL
     BEGIN
         SELECT TOP 1 @MaDatPhongGiaHan = MaDatPhong 
         FROM DatPhong 
@@ -1183,16 +1156,13 @@ GO
 -- Kiểm soát tranh chấp đặt phòng đồng thời bằng cơ chế khóa bi quan
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng/Lễ tân chọn phòng và khoảng thời gian cần giữ chỗ
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng/Lễ tân chọn phòng và khoảng thời gian cần giữ chỗ (để NULL để auto chọn)
     DECLARE @MaPhongChon VARCHAR(10) = 'P005';
     DECLARE @NgayNhanBooking DATE = '2026-11-10';
     DECLARE @NgayTraBooking DATE = '2026-11-15';
 
-    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc phòng đang bảo trì,
-    -- tự động fallback lấy một phòng đang hoạt động bình thường
-    IF @MaPhongChon IS NULL OR NOT EXISTS (
-        SELECT 1 FROM Phong WHERE MaPhong = @MaPhongChon AND TrangThai <> N'Đang bảo trì'
-    )
+    -- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL):
+    IF @MaPhongChon IS NULL
     BEGIN
         SELECT TOP 1 @MaPhongChon = MaPhong 
         FROM Phong 
@@ -1326,18 +1296,12 @@ GO
 -- Xử lý an toàn khi Quản lý nghỉ việc và chuyển giao nhân sự trực thuộc
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Ban Quản lý phê duyệt Quản lý thôi việc và chỉ định Quản lý kế nhiệm
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Ban Quản lý phê duyệt Quản lý thôi việc và chỉ định Quản lý kế nhiệm (để NULL để auto chọn)
     DECLARE @MaNVNghiViec VARCHAR(10) = 'NV020';
     DECLARE @MaQuanLyKeNhiem VARCHAR(10) = 'NV001';
 
-    -- 2. CƠ CHẾ CHỐNG LỖI DEMO:
-    -- Nếu Quản lý thôi việc không hợp lệ (đã nghỉ hoặc không có cấp dưới), tự động fallback lấy một Quản lý đang làm có cấp dưới
-    IF @MaNVNghiViec IS NULL OR NOT EXISTS (
-        SELECT 1 FROM QuanLy ql
-        INNER JOIN NhanVien nv ON ql.MaNV = nv.MaNV
-        WHERE ql.MaNV = @MaNVNghiViec AND nv.TrangThai = N'Đang làm'
-          AND EXISTS (SELECT 1 FROM NhanVien sub WHERE sub.MaQuanLy = ql.MaNV AND sub.TrangThai = N'Đang làm')
-    )
+    -- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL):
+    IF @MaNVNghiViec IS NULL
     BEGIN
         SELECT TOP 1 @MaNVNghiViec = ql.MaNV
         FROM QuanLy ql
@@ -1346,13 +1310,7 @@ BEGIN TRY
         ORDER BY ql.MaNV DESC;
     END;
 
-    -- Nếu Quản lý kế nhiệm không hợp lệ / đã nghỉ việc / trùng với người nghỉ việc,
-    -- tự động fallback lấy một Quản lý khác đang làm việc
-    IF @MaQuanLyKeNhiem IS NULL OR @MaQuanLyKeNhiem = @MaNVNghiViec OR NOT EXISTS (
-        SELECT 1 FROM QuanLy ql
-        INNER JOIN NhanVien nv ON ql.MaNV = nv.MaNV
-        WHERE ql.MaNV = @MaQuanLyKeNhiem AND nv.TrangThai = N'Đang làm'
-    )
+    IF @MaQuanLyKeNhiem IS NULL
     BEGIN
         SELECT TOP 1 @MaQuanLyKeNhiem = ql.MaNV 
         FROM QuanLy ql
@@ -1412,15 +1370,12 @@ GO
 -- Khóa bảo trì phòng khẩn cấp và tìm kiếm các đơn đặt phòng tương lai bị ảnh hưởng
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Bộ phận kỹ thuật báo cáo phòng sự cố và lý do bảo trì
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Bộ phận kỹ thuật báo cáo phòng sự cố và lý do bảo trì (để NULL để auto chọn)
     DECLARE @MaPhongBaoTri VARCHAR(10) = 'P001';
     DECLARE @LyDoBaoTri NVARCHAR(200) = N'Khóa bảo trì đột xuất do sự cố rò rỉ đường ống nước';
 
-    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc phòng đang có khách ở / đã bảo trì,
-    -- tự động fallback lấy một phòng 'Trống' khả dụng để khóa bảo trì demo
-    IF @MaPhongBaoTri IS NULL OR NOT EXISTS (
-        SELECT 1 FROM Phong WHERE MaPhong = @MaPhongBaoTri AND TrangThai = N'Trống'
-    )
+    -- 2. CHẾ ĐỘ TỰ ĐỘNG (CHỈ CHẠY KHI ĐỂ NULL):
+    IF @MaPhongBaoTri IS NULL
     BEGIN
         SELECT TOP 1 @MaPhongBaoTri = MaPhong 
         FROM Phong 
