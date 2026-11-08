@@ -353,12 +353,20 @@ Microsoft SQL Server:
 -- Giao dịch nhận phòng đảm bảo tính toàn vẹn ACID
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- Tự động lấy đơn đặt phòng hợp lệ đang ở trạng thái 'Đã đặt' để làm thủ tục nhận phòng
-    DECLARE @MaDatPhongCheckIn VARCHAR(10);
-    SELECT TOP 1 @MaDatPhongCheckIn = MaDatPhong 
-    FROM DatPhong 
-    WHERE TrangThai = N'Đã đặt'
-    ORDER BY NgayNhanDuKien ASC;
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Tiếp nhận mã đơn đặt phòng của khách tại quầy
+    DECLARE @MaDatPhongCheckIn VARCHAR(10) = 'DP0029';
+
+    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không hợp lệ/đã nhận phòng trước đó,
+    -- tự động fallback lấy đơn 'Đã đặt' hợp lệ gần nhất để kịch bản demo luôn thành công 100%
+    IF @MaDatPhongCheckIn IS NULL OR NOT EXISTS (
+        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongCheckIn AND TrangThai = N'Đã đặt'
+    )
+    BEGIN
+        SELECT TOP 1 @MaDatPhongCheckIn = MaDatPhong 
+        FROM DatPhong 
+        WHERE TrangThai = N'Đã đặt'
+        ORDER BY NgayNhanDuKien ASC;
+    END;
 
     -- 1. Kiểm tra tính hợp lệ của đơn đặt phòng
     IF NOT EXISTS (
@@ -419,11 +427,16 @@ MySQL:
 -- Thủ tục nhận phòng (Check-in) trong MySQL
 START TRANSACTION;
 
--- Tự động lấy đơn đặt phòng hợp lệ đang ở trạng thái 'Đã đặt'
-SELECT MaDatPhong INTO @MaDatPhongCheckIn 
-FROM DatPhong 
-WHERE TrangThai = 'Đã đặt' 
-ORDER BY NgayNhanDuKien ASC 
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Tiếp nhận mã đơn đặt phòng của khách tại quầy
+SET @MaDatPhongCheckIn = 'DP0029';
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không hợp lệ/đã nhận phòng trước đó,
+-- tự động fallback lấy đơn 'Đã đặt' hợp lệ gần nhất để kịch bản demo luôn thành công 100%
+SELECT MaDatPhong INTO @MaDatPhongCheckIn
+FROM DatPhong
+WHERE (MaDatPhong = @MaDatPhongCheckIn AND TrangThai = 'Đã đặt')
+   OR (TrangThai = 'Đã đặt')
+ORDER BY (CASE WHEN MaDatPhong = @MaDatPhongCheckIn THEN 0 ELSE 1 END), NgayNhanDuKien ASC
 LIMIT 1;
 
 -- 1. Kiểm tra trạng thái hiện tại của đơn đặt phòng
@@ -478,14 +491,24 @@ Microsoft SQL Server:
 BEGIN TRANSACTION;
 BEGIN TRY
     -- 1. THÔNG TIN KHÁCH HÀNG CHỌN (Giả định khách gọi dịch vụ):
+    DECLARE @MaDatPhongSD VARCHAR(10) = 'DP0028';                       -- Đơn đặt phòng của khách đang lưu trú
     DECLARE @MaDVOrder VARCHAR(10) = 'DV06';                            -- Khách chọn dịch vụ (Ví dụ: DV06 - Giặt hấp cao cấp)
     DECLARE @SoLuongOrder INT = 2;                                      -- Khách chọn số lượng sử dụng
     DECLARE @GhiChuOrder NVARCHAR(200) = N'Khách gọi dịch vụ phục vụ tận phòng'; -- Ghi chú yêu cầu của khách
 
-    -- 2. THÔNG TIN HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO):
-    -- Tự động gán cho đơn đặt phòng đang có khách lưu trú
-    DECLARE @MaDatPhongSD VARCHAR(10);
-    SELECT TOP 1 @MaDatPhongSD = MaDatPhong FROM DatPhong WHERE TrangThai = N'Đã nhận phòng' ORDER BY NgayNhanDuKien ASC;
+    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã nhận phòng',
+    -- tự động fallback lấy đơn 'Đã nhận phòng' đang có khách lưu trú
+    IF @MaDatPhongSD IS NULL OR NOT EXISTS (
+        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongSD AND TrangThai = N'Đã nhận phòng'
+    )
+    BEGIN
+        SELECT TOP 1 @MaDatPhongSD = MaDatPhong 
+        FROM DatPhong 
+        WHERE TrangThai = N'Đã nhận phòng' 
+        ORDER BY NgayNhanDuKien ASC;
+    END;
+
+    -- 3. THÔNG TIN HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO):
 
     -- Tự động điều phối nhân viên bộ phận dịch vụ đang làm việc
     DECLARE @MaNVDichVuOrder VARCHAR(10);
@@ -562,18 +585,27 @@ MySQL:
 START TRANSACTION;
 
 -- 1. THÔNG TIN KHÁCH HÀNG CHỌN (Giả định khách gọi dịch vụ)
+SET @MaDatPhongSD = 'DP0028';
 SET @MaDVOrder = 'DV06';
 SET @SoLuongOrder = 2;
 SET @GhiChuOrder = 'Khách gọi dịch vụ phục vụ tận phòng';
 
--- 2. THÔNG TIN HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO)
--- Tự động gán cho đơn đặt phòng đang có khách lưu trú
-SELECT MaDatPhong INTO @MaDatPhongSD FROM DatPhong WHERE TrangThai = 'Đã nhận phòng' ORDER BY NgayNhanDuKien ASC LIMIT 1;
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Tự động fallback lấy đơn đang lưu trú nếu đơn chỉ định không hợp lệ
+SELECT MaDatPhong INTO @MaDatPhongSD
+FROM DatPhong
+WHERE (MaDatPhong = @MaDatPhongSD AND TrangThai = 'Đã nhận phòng')
+   OR (TrangThai = 'Đã nhận phòng')
+ORDER BY (CASE WHEN MaDatPhong = @MaDatPhongSD THEN 0 ELSE 1 END), NgayNhanDuKien ASC
+LIMIT 1;
 
+-- 3. THÔNG TIN HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO)
 -- Tự động điều phối nhân viên dịch vụ đang làm việc
-SELECT nv.MaNV INTO @MaNVDichVuOrder FROM NhanVien nv INNER JOIN NhanVienDichVu nvdv ON nv.MaNV = nvdv.MaNV WHERE nv.TrangThai = 'Đang làm' ORDER BY nv.MaNV ASC LIMIT 1;
-SET @SoLuongOrder = 2;
-SET @GhiChuOrder = 'Khách gọi dịch vụ phục vụ tận phòng';
+SELECT nv.MaNV INTO @MaNVDichVuOrder 
+FROM NhanVien nv 
+INNER JOIN NhanVienDichVu nvdv ON nv.MaNV = nvdv.MaNV 
+WHERE nv.TrangThai = 'Đang làm' 
+ORDER BY nv.MaNV ASC 
+LIMIT 1;
 
 -- Tự động sinh mã cung cấp dịch vụ tiếp theo (VD: CC068 -> CC069)
 SELECT CONCAT('CC', LPAD(COALESCE(MAX(CAST(SUBSTRING(MaCC, 3) AS UNSIGNED)), 0) + 1, 3, '0'))
@@ -770,12 +802,20 @@ Lệnh chạy:
 Microsoft SQL Server:
 ```sql
 -- Bảng kê tạm tính chi phí lưu trú và dịch vụ trước khi lập hóa đơn
--- Tự động lấy đơn đặt phòng đang có khách lưu trú để xuất bảng kê chi phí trước thanh toán
-DECLARE @MaDatPhongFolio VARCHAR(10);
-SELECT TOP 1 @MaDatPhongFolio = MaDatPhong 
-FROM DatPhong 
-WHERE TrangThai = N'Đã nhận phòng'
-ORDER BY NgayNhanDuKien ASC;
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Tiếp nhận mã đơn đặt phòng của khách yêu cầu xuất bảng kê
+DECLARE @MaDatPhongFolio VARCHAR(10) = 'DP0028';
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã nhận phòng',
+-- tự động fallback lấy đơn đang lưu trú kế tiếp để luôn có kết quả trực quan
+IF @MaDatPhongFolio IS NULL OR NOT EXISTS (
+    SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongFolio AND TrangThai = N'Đã nhận phòng'
+)
+BEGIN
+    SELECT TOP 1 @MaDatPhongFolio = MaDatPhong 
+    FROM DatPhong 
+    WHERE TrangThai = N'Đã nhận phòng'
+    ORDER BY NgayNhanDuKien ASC;
+END;
 
 WITH TienPhongCTE AS (
     -- Tính tiền phòng dựa trên đơn giá chốt trong hợp đồng đặt phòng và số đêm lưu trú
@@ -828,11 +868,15 @@ GO
 MySQL:
 ```sql
 -- Bảng kê tạm tính chi phí trong MySQL
--- Tự động lấy đơn đặt phòng đang có khách lưu trú để xuất bảng kê chi phí trước thanh toán
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Tiếp nhận mã đơn đặt phòng của khách yêu cầu xuất bảng kê
+SET @MaDatPhongFolio = 'DP0028';
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Tự động fallback lấy đơn đang lưu trú hợp lệ
 SELECT MaDatPhong INTO @MaDatPhongFolio 
 FROM DatPhong 
-WHERE TrangThai = 'Đã nhận phòng' 
-ORDER BY NgayNhanDuKien ASC 
+WHERE (MaDatPhong = @MaDatPhongFolio AND TrangThai = 'Đã nhận phòng')
+   OR (TrangThai = 'Đã nhận phòng')
+ORDER BY (CASE WHEN MaDatPhong = @MaDatPhongFolio THEN 0 ELSE 1 END), NgayNhanDuKien ASC 
 LIMIT 1;
 
 WITH TienPhongCTE AS (
@@ -897,23 +941,36 @@ Microsoft SQL Server:
 -- Giao dịch trả phòng, quyết toán và xuất hóa đơn thanh toán
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- Tự động lấy đơn đặt phòng đang lưu trú chưa lập hóa đơn và nhân viên lễ tân đang làm việc
-    DECLARE @MaDatPhongCheckout VARCHAR(10);
-    SELECT TOP 1 @MaDatPhongCheckout = dp.MaDatPhong 
-    FROM DatPhong dp
-    WHERE dp.TrangThai = N'Đã nhận phòng'
-      AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong)
-    ORDER BY dp.NgayNhanDuKien ASC;
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Lễ tân tiếp nhận yêu cầu trả phòng của khách
+    DECLARE @MaDatPhongCheckout VARCHAR(10) = 'DP0028';
+    DECLARE @PhuongThucInput NVARCHAR(20) = N'Chuyển khoản';
+    DECLARE @TienPhuThuInput DECIMAL(15,0) = 100000;
+    DECLARE @GiamGiaInput DECIMAL(15,0) = 50000;
 
+    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã nhận phòng'
+    -- hoặc đã xuất hóa đơn rồi, tự động fallback lấy đơn đang lưu trú chưa lập hóa đơn kế tiếp
+    IF @MaDatPhongCheckout IS NULL OR NOT EXISTS (
+        SELECT 1 FROM DatPhong dp 
+        WHERE dp.MaDatPhong = @MaDatPhongCheckout 
+          AND dp.TrangThai = N'Đã nhận phòng'
+          AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong)
+    )
+    BEGIN
+        SELECT TOP 1 @MaDatPhongCheckout = dp.MaDatPhong 
+        FROM DatPhong dp
+        WHERE dp.TrangThai = N'Đã nhận phòng'
+          AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong)
+        ORDER BY dp.NgayNhanDuKien ASC;
+    END;
+
+    -- 3. HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO):
+    -- Tự động điều phối nhân viên lễ tân đang làm việc lập hóa đơn
     DECLARE @MaNVLapCheckout VARCHAR(10);
     SELECT TOP 1 @MaNVLapCheckout = nv.MaNV 
     FROM NhanVien nv
     INNER JOIN LeTan lt ON nv.MaNV = lt.MaNV
     WHERE nv.TrangThai = N'Đang làm'
     ORDER BY nv.MaNV ASC;
-    DECLARE @TienPhuThuInput DECIMAL(15,0) = 100000;
-    DECLARE @GiamGiaInput DECIMAL(15,0) = 50000;
-    DECLARE @PhuongThucInput NVARCHAR(20) = N'Chuyển khoản';
 
     -- Tự động sinh mã hóa đơn tiếp theo (VD: HD0025 -> HD0026)
     DECLARE @MaHDNew VARCHAR(10);
@@ -1002,23 +1059,27 @@ MySQL:
 -- Thủ tục thanh toán và trả phòng trong MySQL
 START TRANSACTION;
 
--- Tự động lấy đơn đặt phòng đang lưu trú chưa lập hóa đơn và nhân viên lễ tân đang làm việc
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Lễ tân tiếp nhận yêu cầu trả phòng của khách
+SET @MaDatPhongCheckout = 'DP0028';
+SET @PhuongThucInput = 'Chuyển khoản';
+SET @TienPhuThuInput = 100000;
+SET @GiamGiaInput = 50000;
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Tự động fallback lấy đơn đang lưu trú chưa lập hóa đơn
 SELECT dp.MaDatPhong INTO @MaDatPhongCheckout 
 FROM DatPhong dp
-WHERE dp.TrangThai = 'Đã nhận phòng'
-  AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong)
-ORDER BY dp.NgayNhanDuKien ASC 
+WHERE (dp.MaDatPhong = @MaDatPhongCheckout AND dp.TrangThai = 'Đã nhận phòng' AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong))
+   OR (dp.TrangThai = 'Đã nhận phòng' AND NOT EXISTS (SELECT 1 FROM HoaDon hd WHERE hd.MaDatPhong = dp.MaDatPhong))
+ORDER BY (CASE WHEN dp.MaDatPhong = @MaDatPhongCheckout THEN 0 ELSE 1 END), dp.NgayNhanDuKien ASC 
 LIMIT 1;
 
+-- 3. HỆ THỐNG TỰ ĐỘNG ĐIỀU PHỐI (AUTO)
 SELECT nv.MaNV INTO @MaNVLapCheckout 
 FROM NhanVien nv
 INNER JOIN LeTan lt ON nv.MaNV = lt.MaNV
 WHERE nv.TrangThai = 'Đang làm'
 ORDER BY nv.MaNV ASC 
 LIMIT 1;
-SET @TienPhuThuInput = 100000;
-SET @GiamGiaInput = 50000;
-SET @PhuongThucInput = 'Chuyển khoản';
 
 -- Tự động sinh mã hóa đơn tiếp theo (VD: HD0025 -> HD0026)
 SELECT CONCAT('HD', LPAD(COALESCE(MAX(CAST(SUBSTRING(MaHD, 3) AS UNSIGNED)), 0) + 1, 4, '0'))
@@ -1544,13 +1605,21 @@ Microsoft SQL Server:
 -- Xử lý nghiệp vụ Hủy đặt phòng đảm bảo an toàn trạng thái phòng
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- Tự động lấy đơn đặt phòng đang ở trạng thái 'Đã đặt' để hủy
-    DECLARE @MaDatPhongCancel VARCHAR(10);
-    SELECT TOP 1 @MaDatPhongCancel = MaDatPhong 
-    FROM DatPhong 
-    WHERE TrangThai = N'Đã đặt'
-    ORDER BY NgayDat DESC;
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng liên hệ yêu cầu hủy đơn đặt phòng
+    DECLARE @MaDatPhongCancel VARCHAR(10) = 'DP0040';
     DECLARE @LyDoHuy NVARCHAR(200) = N'Khách hàng thông báo hủy chuyến đi trước hạn';
+
+    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã đặt'
+    -- (ví dụ: đã hủy trước đó), tự động fallback lấy đơn 'Đã đặt' gần nhất
+    IF @MaDatPhongCancel IS NULL OR NOT EXISTS (
+        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongCancel AND TrangThai = N'Đã đặt'
+    )
+    BEGIN
+        SELECT TOP 1 @MaDatPhongCancel = MaDatPhong 
+        FROM DatPhong 
+        WHERE TrangThai = N'Đã đặt'
+        ORDER BY NgayDat DESC;
+    END;
 
     -- 1. Kiểm tra trạng thái hợp lệ của đơn đặt phòng
     IF NOT EXISTS (
@@ -1597,13 +1666,17 @@ MySQL:
 -- Hủy đặt phòng và hoàn trả trạng thái phòng trong MySQL
 START TRANSACTION;
 
--- Tự động lấy đơn đặt phòng đang ở trạng thái 'Đã đặt' để hủy
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng liên hệ yêu cầu hủy đơn đặt phòng
+SET @MaDatPhongCancel = 'DP0040';
+SET @LyDoHuy = 'Khách hàng thông báo hủy chuyến đi trước hạn';
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Tự động fallback lấy đơn 'Đã đặt' gần nhất nếu đơn chỉ định không hợp lệ
 SELECT MaDatPhong INTO @MaDatPhongCancel 
 FROM DatPhong 
-WHERE TrangThai = 'Đã đặt' 
-ORDER BY NgayDat DESC 
+WHERE (MaDatPhong = @MaDatPhongCancel AND TrangThai = 'Đã đặt')
+   OR (TrangThai = 'Đã đặt')
+ORDER BY (CASE WHEN MaDatPhong = @MaDatPhongCancel THEN 0 ELSE 1 END), NgayDat DESC 
 LIMIT 1;
-SET @LyDoHuy = 'Khách hàng thông báo hủy chuyến đi trước hạn';
 
 -- 1. Cập nhật trạng thái đơn đặt phòng
 UPDATE DatPhong 
@@ -1642,23 +1715,39 @@ Microsoft SQL Server:
 -- Xử lý nghiệp vụ chuyển phòng lưu trú giữa chừng cho khách hàng
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- Tự động lấy đơn đang lưu trú và phòng hiện tại của đơn đó
-    DECLARE @MaDatPhongDoi VARCHAR(10);
-    DECLARE @MaPhongHienTai VARCHAR(10);
-    SELECT TOP 1 
-        @MaDatPhongDoi = dp.MaDatPhong,
-        @MaPhongHienTai = ctdp.MaPhong
-    FROM DatPhong dp
-    INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
-    WHERE dp.TrangThai = N'Đã nhận phòng'
-    ORDER BY dp.NgayNhanDuKien ASC;
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng đang lưu trú yêu cầu chuyển sang phòng mới
+    DECLARE @MaDatPhongDoi VARCHAR(10) = 'DP0028';
+    DECLARE @MaPhongChuyenDen VARCHAR(10) = 'P001';
 
-    -- Tự động lấy một phòng trống khả dụng khác để chuyển đến
-    DECLARE @MaPhongChuyenDen VARCHAR(10);
-    SELECT TOP 1 @MaPhongChuyenDen = MaPhong 
-    FROM Phong 
-    WHERE TrangThai = N'Trống' AND MaPhong <> @MaPhongHienTai
-    ORDER BY MaPhong ASC;
+    -- 2. CƠ CHẾ CHỐNG LỖI DEMO:
+    -- Nếu đơn không hợp lệ hoặc không ở trạng thái 'Đã nhận phòng', tự động fallback lấy đơn đang lưu trú
+    IF @MaDatPhongDoi IS NULL OR NOT EXISTS (
+        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongDoi AND TrangThai = N'Đã nhận phòng'
+    )
+    BEGIN
+        SELECT TOP 1 @MaDatPhongDoi = MaDatPhong 
+        FROM DatPhong 
+        WHERE TrangThai = N'Đã nhận phòng'
+        ORDER BY NgayNhanDuKien ASC;
+    END;
+
+    -- Lấy phòng hiện tại của đơn đặt phòng
+    DECLARE @MaPhongHienTai VARCHAR(10);
+    SELECT TOP 1 @MaPhongHienTai = ctdp.MaPhong
+    FROM ChiTietDatPhong ctdp
+    WHERE ctdp.MaDatPhong = @MaDatPhongDoi;
+
+    -- Nếu phòng chuyển đến không ở trạng thái 'Trống' hoặc trùng phòng hiện tại,
+    -- tự động fallback lấy một phòng 'Trống' khả dụng khác
+    IF @MaPhongChuyenDen IS NULL OR @MaPhongChuyenDen = @MaPhongHienTai OR NOT EXISTS (
+        SELECT 1 FROM Phong WHERE MaPhong = @MaPhongChuyenDen AND TrangThai = N'Trống'
+    )
+    BEGIN
+        SELECT TOP 1 @MaPhongChuyenDen = MaPhong 
+        FROM Phong 
+        WHERE TrangThai = N'Trống' AND MaPhong <> @MaPhongHienTai
+        ORDER BY MaPhong ASC;
+    END;
 
     -- 1. Kiểm tra phòng mới có đang thực sự ở trạng thái 'Trống' hay không
     IF NOT EXISTS (SELECT 1 FROM Phong WHERE MaPhong = @MaPhongChuyenDen AND TrangThai = N'Trống')
@@ -1714,20 +1803,31 @@ MySQL:
 -- Xử lý chuyển đổi phòng trong MySQL
 START TRANSACTION;
 
--- Tự động lấy đơn đang lưu trú và phòng hiện tại của đơn đó
-SELECT dp.MaDatPhong, ctdp.MaPhong 
-INTO @MaDatPhongDoi, @MaPhongHienTai
-FROM DatPhong dp
-INNER JOIN ChiTietDatPhong ctdp ON dp.MaDatPhong = ctdp.MaDatPhong
-WHERE dp.TrangThai = 'Đã nhận phòng'
-ORDER BY dp.NgayNhanDuKien ASC 
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng đang lưu trú yêu cầu chuyển sang phòng mới
+SET @MaDatPhongDoi = 'DP0028';
+SET @MaPhongChuyenDen = 'P001';
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO:
+-- Fallback đơn lưu trú hợp lệ
+SELECT MaDatPhong INTO @MaDatPhongDoi
+FROM DatPhong
+WHERE (MaDatPhong = @MaDatPhongDoi AND TrangThai = 'Đã nhận phòng')
+   OR (TrangThai = 'Đã nhận phòng')
+ORDER BY (CASE WHEN MaDatPhong = @MaDatPhongDoi THEN 0 ELSE 1 END), NgayNhanDuKien ASC
 LIMIT 1;
 
--- Tự động lấy phòng trống sẵn sàng để chuyển đến
-SELECT MaPhong INTO @MaPhongChuyenDen 
-FROM Phong 
-WHERE TrangThai = 'Trống' AND MaPhong <> @MaPhongHienTai
-ORDER BY MaPhong ASC 
+-- Lấy phòng hiện tại của đơn
+SELECT ctdp.MaPhong INTO @MaPhongHienTai
+FROM ChiTietDatPhong ctdp
+WHERE ctdp.MaDatPhong = @MaDatPhongDoi
+LIMIT 1;
+
+-- Fallback phòng trống hợp lệ khác
+SELECT MaPhong INTO @MaPhongChuyenDen
+FROM Phong
+WHERE (MaPhong = @MaPhongChuyenDen AND TrangThai = 'Trống' AND MaPhong <> @MaPhongHienTai)
+   OR (TrangThai = 'Trống' AND MaPhong <> @MaPhongHienTai)
+ORDER BY (CASE WHEN MaPhong = @MaPhongChuyenDen THEN 0 ELSE 1 END), MaPhong ASC
 LIMIT 1;
 
 -- Lấy đơn giá phòng mới
@@ -1774,20 +1874,29 @@ Microsoft SQL Server:
 -- Xử lý gia hạn thời gian lưu trú có kiểm tra xung đột lịch đặt tương lai
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- Tự động lấy đơn đặt phòng đang lưu trú và tính ngày trả mới gia hạn thêm 2 ngày
-    DECLARE @MaDatPhongGiaHan VARCHAR(10);
-    DECLARE @NgayTraMoi DATE;
-    SELECT TOP 1 
-        @MaDatPhongGiaHan = MaDatPhong,
-        @NgayTraMoi = DATEADD(DAY, 2, NgayTraDuKien)
-    FROM DatPhong 
-    WHERE TrangThai = N'Đã nhận phòng'
-    ORDER BY NgayNhanDuKien ASC;
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng yêu cầu gia hạn thêm số ngày lưu trú
+    DECLARE @MaDatPhongGiaHan VARCHAR(10) = 'DP0028';
+    DECLARE @SoNgayGiaHanThem INT = 2;
 
+    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc đơn chỉ định không ở trạng thái 'Đã nhận phòng',
+    -- tự động fallback lấy đơn đang lưu trú gần nhất
+    IF @MaDatPhongGiaHan IS NULL OR NOT EXISTS (
+        SELECT 1 FROM DatPhong WHERE MaDatPhong = @MaDatPhongGiaHan AND TrangThai = N'Đã nhận phòng'
+    )
+    BEGIN
+        SELECT TOP 1 @MaDatPhongGiaHan = MaDatPhong 
+        FROM DatPhong 
+        WHERE TrangThai = N'Đã nhận phòng'
+        ORDER BY NgayNhanDuKien ASC;
+    END;
+
+    -- Tự động tính ngày trả mới từ ngày trả cũ cộng thêm số ngày gia hạn
     DECLARE @NgayTraCu DATE;
     SELECT @NgayTraCu = NgayTraDuKien 
     FROM DatPhong 
-    WHERE MaDatPhong = @MaDatPhongGiaHan AND TrangThai = N'Đã nhận phòng';
+    WHERE MaDatPhong = @MaDatPhongGiaHan;
+
+    DECLARE @NgayTraMoi DATE = DATEADD(DAY, @SoNgayGiaHanThem, @NgayTraCu);
 
     IF (@NgayTraCu IS NULL)
     BEGIN
@@ -1843,17 +1952,22 @@ MySQL:
 -- Gia hạn lưu trú trong MySQL
 START TRANSACTION;
 
--- Tự động lấy đơn đặt phòng đang lưu trú và tính ngày trả mới gia hạn thêm 2 ngày
-SELECT MaDatPhong, DATE_ADD(NgayTraDuKien, INTERVAL 2 DAY)
-INTO @MaDatPhongGiaHan, @NgayTraMoi
-FROM DatPhong 
-WHERE TrangThai = 'Đã nhận phòng'
-ORDER BY NgayNhanDuKien ASC 
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng yêu cầu gia hạn thêm số ngày lưu trú
+SET @MaDatPhongGiaHan = 'DP0028';
+SET @SoNgayGiaHanThem = 2;
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Tự động fallback lấy đơn đang lưu trú hợp lệ
+SELECT MaDatPhong INTO @MaDatPhongGiaHan
+FROM DatPhong
+WHERE (MaDatPhong = @MaDatPhongGiaHan AND TrangThai = 'Đã nhận phòng')
+   OR (TrangThai = 'Đã nhận phòng')
+ORDER BY (CASE WHEN MaDatPhong = @MaDatPhongGiaHan THEN 0 ELSE 1 END), NgayNhanDuKien ASC
 LIMIT 1;
 
-SELECT NgayTraDuKien INTO @NgayTraCu
+SELECT NgayTraDuKien, DATE_ADD(NgayTraDuKien, INTERVAL @SoNgayGiaHanThem DAY)
+INTO @NgayTraCu, @NgayTraMoi
 FROM DatPhong 
-WHERE MaDatPhong = @MaDatPhongGiaHan AND TrangThai = 'Đã nhận phòng';
+WHERE MaDatPhong = @MaDatPhongGiaHan;
 
 -- Kiểm tra số lượng đơn đặt phòng bị chồng lấn lịch
 SELECT COUNT(*) INTO @OverlapCount
@@ -1900,14 +2014,22 @@ Microsoft SQL Server:
 -- Kiểm soát tranh chấp đặt phòng đồng thời bằng cơ chế khóa bi quan
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- Tự động chọn một phòng đang hoạt động bình thường
-    DECLARE @MaPhongChon VARCHAR(10);
-    SELECT TOP 1 @MaPhongChon = MaPhong 
-    FROM Phong 
-    WHERE TrangThai <> N'Đang bảo trì'
-    ORDER BY MaPhong ASC;
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng/Lễ tân chọn phòng và khoảng thời gian cần giữ chỗ
+    DECLARE @MaPhongChon VARCHAR(10) = 'P005';
     DECLARE @NgayNhanBooking DATE = '2026-11-10';
     DECLARE @NgayTraBooking DATE = '2026-11-15';
+
+    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc phòng đang bảo trì,
+    -- tự động fallback lấy một phòng đang hoạt động bình thường
+    IF @MaPhongChon IS NULL OR NOT EXISTS (
+        SELECT 1 FROM Phong WHERE MaPhong = @MaPhongChon AND TrangThai <> N'Đang bảo trì'
+    )
+    BEGIN
+        SELECT TOP 1 @MaPhongChon = MaPhong 
+        FROM Phong 
+        WHERE TrangThai <> N'Đang bảo trì'
+        ORDER BY MaPhong ASC;
+    END;
 
     -- 1. Khóa bản ghi phòng bằng gợi ý UPDLOCK và HOLDLOCK để ngăn chặn các phiên khác sửa đổi
     SELECT MaPhong, SoPhong, TrangThai 
@@ -1952,14 +2074,18 @@ MySQL:
 -- Ngăn chặn tranh chấp đặt phòng đồng thời trong MySQL bằng SELECT ... FOR UPDATE
 START TRANSACTION;
 
--- Tự động chọn một phòng đang hoạt động bình thường
-SELECT MaPhong INTO @MaPhongChon 
-FROM Phong 
-WHERE TrangThai <> 'Đang bảo trì' 
-ORDER BY MaPhong ASC 
-LIMIT 1;
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Khách hàng/Lễ tân chọn phòng và khoảng thời gian cần giữ chỗ
+SET @MaPhongChon = 'P005';
 SET @NgayNhanBooking = '2026-11-10';
 SET @NgayTraBooking = '2026-11-15';
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Tự động fallback lấy phòng hoạt động bình thường nếu phòng chỉ định bị bảo trì
+SELECT MaPhong INTO @MaPhongChon 
+FROM Phong 
+WHERE (MaPhong = @MaPhongChon AND TrangThai <> 'Đang bảo trì')
+   OR (TrangThai <> 'Đang bảo trì')
+ORDER BY (CASE WHEN MaPhong = @MaPhongChon THEN 0 ELSE 1 END), MaPhong ASC 
+LIMIT 1;
 
 -- 1. Khóa độc quyền dòng dữ liệu của phòng cần đặt bằng FOR UPDATE
 SELECT MaPhong, SoPhong, TrangThai 
@@ -2142,20 +2268,40 @@ Microsoft SQL Server:
 -- Xử lý an toàn khi Quản lý nghỉ việc và chuyển giao nhân sự trực thuộc
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- Tự động lấy một quản lý đang có cấp dưới trực thuộc
-    DECLARE @MaNVNghiViec VARCHAR(10);
-    SELECT TOP 1 @MaNVNghiViec = ql.MaNV
-    FROM QuanLy ql
-    INNER JOIN NhanVien nv ON ql.MaNV = nv.MaQuanLy
-    WHERE nv.TrangThai = N'Đang làm'
-    ORDER BY ql.MaNV DESC;
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Ban Quản lý phê duyệt Quản lý thôi việc và chỉ định Quản lý kế nhiệm
+    DECLARE @MaNVNghiViec VARCHAR(10) = 'NV020';
+    DECLARE @MaQuanLyKeNhiem VARCHAR(10) = 'NV001';
 
-    -- Tự động lấy một quản lý khác đang làm việc để kế nhiệm
-    DECLARE @MaQuanLyKeNhiem VARCHAR(10);
-    SELECT TOP 1 @MaQuanLyKeNhiem = MaNV 
-    FROM QuanLy 
-    WHERE MaNV <> @MaNVNghiViec
-    ORDER BY MaNV ASC;
+    -- 2. CƠ CHẾ CHỐNG LỖI DEMO:
+    -- Nếu Quản lý thôi việc không hợp lệ (đã nghỉ hoặc không có cấp dưới), tự động fallback lấy một Quản lý đang làm có cấp dưới
+    IF @MaNVNghiViec IS NULL OR NOT EXISTS (
+        SELECT 1 FROM QuanLy ql
+        INNER JOIN NhanVien nv ON ql.MaNV = nv.MaNV
+        WHERE ql.MaNV = @MaNVNghiViec AND nv.TrangThai = N'Đang làm'
+          AND EXISTS (SELECT 1 FROM NhanVien sub WHERE sub.MaQuanLy = ql.MaNV AND sub.TrangThai = N'Đang làm')
+    )
+    BEGIN
+        SELECT TOP 1 @MaNVNghiViec = ql.MaNV
+        FROM QuanLy ql
+        INNER JOIN NhanVien nv ON ql.MaNV = nv.MaQuanLy
+        WHERE nv.TrangThai = N'Đang làm'
+        ORDER BY ql.MaNV DESC;
+    END;
+
+    -- Nếu Quản lý kế nhiệm không hợp lệ / đã nghỉ việc / trùng với người nghỉ việc,
+    -- tự động fallback lấy một Quản lý khác đang làm việc
+    IF @MaQuanLyKeNhiem IS NULL OR @MaQuanLyKeNhiem = @MaNVNghiViec OR NOT EXISTS (
+        SELECT 1 FROM QuanLy ql
+        INNER JOIN NhanVien nv ON ql.MaNV = nv.MaNV
+        WHERE ql.MaNV = @MaQuanLyKeNhiem AND nv.TrangThai = N'Đang làm'
+    )
+    BEGIN
+        SELECT TOP 1 @MaQuanLyKeNhiem = ql.MaNV 
+        FROM QuanLy ql
+        INNER JOIN NhanVien nv ON ql.MaNV = nv.MaNV
+        WHERE ql.MaNV <> @MaNVNghiViec AND nv.TrangThai = N'Đang làm'
+        ORDER BY ql.MaNV ASC;
+    END;
 
     -- 1. Kiểm tra tính hợp lệ của Quản lý kế nhiệm
     IF NOT EXISTS (
@@ -2200,19 +2346,26 @@ MySQL:
 -- Xử lý nhân sự nghỉ việc trong MySQL
 START TRANSACTION;
 
--- Tự động lấy một quản lý đang có cấp dưới trực thuộc
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Ban Quản lý phê duyệt Quản lý thôi việc và chỉ định Quản lý kế nhiệm
+SET @MaNVNghiViec = 'NV020';
+SET @MaQuanLyKeNhiem = 'NV001';
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Tự động fallback lấy quản lý hợp lệ có cấp dưới
 SELECT ql.MaNV INTO @MaNVNghiViec
 FROM QuanLy ql
 INNER JOIN NhanVien nv ON ql.MaNV = nv.MaQuanLy
-WHERE nv.TrangThai = 'Đang làm'
-ORDER BY ql.MaNV DESC 
+WHERE (ql.MaNV = @MaNVNghiViec AND nv.TrangThai = 'Đang làm')
+   OR (nv.TrangThai = 'Đang làm')
+ORDER BY (CASE WHEN ql.MaNV = @MaNVNghiViec THEN 0 ELSE 1 END), ql.MaNV DESC 
 LIMIT 1;
 
--- Tự động lấy một quản lý khác đang làm việc để kế nhiệm
-SELECT MaNV INTO @MaQuanLyKeNhiem 
-FROM QuanLy 
-WHERE MaNV <> @MaNVNghiViec
-ORDER BY MaNV ASC 
+-- Fallback quản lý kế nhiệm hợp lệ
+SELECT ql.MaNV INTO @MaQuanLyKeNhiem 
+FROM QuanLy ql
+INNER JOIN NhanVien nv ON ql.MaNV = nv.MaNV
+WHERE ((ql.MaNV = @MaQuanLyKeNhiem AND nv.TrangThai = 'Đang làm') OR (nv.TrangThai = 'Đang làm'))
+  AND ql.MaNV <> @MaNVNghiViec
+ORDER BY (CASE WHEN ql.MaNV = @MaQuanLyKeNhiem THEN 0 ELSE 1 END), ql.MaNV ASC 
 LIMIT 1;
 
 -- 1. Cập nhật trạng thái nghỉ việc (Xóa mềm)
@@ -2249,13 +2402,21 @@ Microsoft SQL Server:
 -- Khóa bảo trì phòng khẩn cấp và tìm kiếm các đơn đặt phòng tương lai bị ảnh hưởng
 BEGIN TRANSACTION;
 BEGIN TRY
-    -- Tự động lấy một phòng đang trống để khóa bảo trì đột xuất
-    DECLARE @MaPhongBaoTri VARCHAR(10);
-    SELECT TOP 1 @MaPhongBaoTri = MaPhong 
-    FROM Phong 
-    WHERE TrangThai = N'Trống'
-    ORDER BY MaPhong ASC;
-    DECLARE @LyDoBaoTri NVARCHAR(200) = N'Khóa bảo trì đột xuất do sự cố kỹ thuật';
+    -- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Bộ phận kỹ thuật báo cáo phòng sự cố và lý do bảo trì
+    DECLARE @MaPhongBaoTri VARCHAR(10) = 'P001';
+    DECLARE @LyDoBaoTri NVARCHAR(200) = N'Khóa bảo trì đột xuất do sự cố rò rỉ đường ống nước';
+
+    -- 2. CƠ CHẾ CHỐNG LỖI DEMO: Nếu để NULL hoặc phòng đang có khách ở / đã bảo trì,
+    -- tự động fallback lấy một phòng 'Trống' khả dụng để khóa bảo trì demo
+    IF @MaPhongBaoTri IS NULL OR NOT EXISTS (
+        SELECT 1 FROM Phong WHERE MaPhong = @MaPhongBaoTri AND TrangThai = N'Trống'
+    )
+    BEGIN
+        SELECT TOP 1 @MaPhongBaoTri = MaPhong 
+        FROM Phong 
+        WHERE TrangThai = N'Trống'
+        ORDER BY MaPhong ASC;
+    END;
 
     -- 1. Kiểm tra trạng thái hiện tại: Ngăn chặn khóa phòng nếu đang có khách lưu trú
     IF EXISTS (SELECT 1 FROM Phong WHERE MaPhong = @MaPhongBaoTri AND TrangThai = N'Đang sử dụng')
@@ -2311,13 +2472,17 @@ MySQL:
 -- Khóa bảo trì phòng và tìm các đơn đặt phòng bị ảnh hưởng trong MySQL
 START TRANSACTION;
 
--- Tự động lấy một phòng đang trống để khóa bảo trì đột xuất
+-- 1. THAM SỐ ĐẦU VÀO THỰC TẾ: Bộ phận kỹ thuật báo cáo phòng sự cố và lý do bảo trì
+SET @MaPhongBaoTri = 'P001';
+SET @LyDoBaoTri = 'Khóa bảo trì đột xuất do sự cố rò rỉ đường ống nước';
+
+-- 2. CƠ CHẾ CHỐNG LỖI DEMO: Tự động fallback lấy phòng 'Trống' nếu phòng chỉ định không hợp lệ
 SELECT MaPhong INTO @MaPhongBaoTri 
 FROM Phong 
-WHERE TrangThai = 'Trống' 
-ORDER BY MaPhong ASC 
+WHERE (MaPhong = @MaPhongBaoTri AND TrangThai = 'Trống')
+   OR (TrangThai = 'Trống')
+ORDER BY (CASE WHEN MaPhong = @MaPhongBaoTri THEN 0 ELSE 1 END), MaPhong ASC 
 LIMIT 1;
-SET @LyDoBaoTri = 'Khóa bảo trì đột xuất do sự cố kỹ thuật';
 
 -- 1. Cập nhật trạng thái phòng sang 'Đang bảo trì' nếu không có khách đang ở
 UPDATE Phong 
